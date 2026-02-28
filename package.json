@@ -1,0 +1,57 @@
+{
+	"name": "@kitforge/billing",
+	"version": "1.0.0",
+	"description": "Billing engine for KitForge — self-contained billing system with services, providers, and web standard handler",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"files": ["dist"],
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./client": {
+			"import": "./dist/client.js",
+			"types": "./dist/client.d.ts"
+		},
+		"./repositories/drizzle": {
+			"import": "./dist/repositories/drizzle/index.js",
+			"types": "./dist/repositories/drizzle/index.d.ts"
+		},
+		"./providers/stripe": {
+			"import": "./dist/providers/stripe/index.js",
+			"types": "./dist/providers/stripe/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup",
+		"prepublishOnly": "pnpm build",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"nanoid": "^5.1.6",
+		"zod": "^3.25.76"
+	},
+	"peerDependencies": {
+		"drizzle-orm": "^0.41.0",
+		"stripe": "^20.0.0"
+	},
+	"peerDependenciesMeta": {
+		"drizzle-orm": {
+			"optional": true
+		},
+		"stripe": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"drizzle-orm": "^0.41.0",
+		"stripe": "^20.3.1",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.9"
+	}
+}

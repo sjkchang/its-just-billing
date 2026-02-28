@@ -1,0 +1,360 @@
+/**
+ * Billing checkout service — handles checkout, portal, and subscription management.
+ */
+
+import { nanoid } from "nanoid";
+import type { BillingProviders, BillingSubscription } from "../providers";
+import type { BillingProviderType } from "../entities";
+import { isActive, getChangeDirection, strategyToProrationBehavior } from "../domain";
+import type { BillingRepositories } from "../repository";
+import type { BillingAppConfig } from "../config";
+import { runBeforeHook, runAfterHook } from "../hooks";
+import type { BillingUser } from "../hooks";
+import { BillingBadRequestError, BillingNotFoundError } from "../errors";
+import type { BillingLogger } from "../types";
+import { defaultLogger } from "../types";
+
+export interface CheckoutInput {
+  productId: string;
+  successUrl: string;
+  cancelUrl?: string;
+}
+
+export interface CheckoutResult {
+  checkoutUrl: string;
+}
+
+export interface PortalResult {
+  portalUrl: string;
+}
+
+export interface ChangeSubscriptionInput {
+  subscriptionId: string;
+  productId: string;
+}
+
+export class BillingCheckoutService {
+  constructor(
+    private adapter: BillingRepositories,
+    private billing: BillingProviders,
+    private billingProvider: BillingProviderType,
+    private config: BillingAppConfig,
+    private logger: BillingLogger = defaultLogger
+  ) {}
+
+  /**
+   * Get or create a billing customer for the user.
+   * Checks local DB first, then creates in provider + local if needed.
+   */
+  private async getOrCreateCustomer(user: BillingUser) {
+    const provider = this.billingProvider;
+    const existing = await this.adapter.customers.findByUserId(user.id, provider);
+    if (existing) return existing;
+
+    const providerCustomer = await this.billing.customers.createCustomer(
+      user.email,
+      user.id,
+      user.name ?? undefined
+    );
+
+    try {
+      const customer = await this.adapter.customers.create({
+        id: nanoid(),
+        userId: user.id,
+        provider,
+        providerCustomerId: providerCustomer.id,
+        email: user.email,
+        name: user.name,
+      });
+
+      this.logger.info("Created billing customer", {
+        userId: user.id,
+        customerId: customer.id,
+        providerCustomerId: providerCustomer.id,
+      });
+
+      runAfterHook(
+        this.config.hooks?.lifecycle?.onCustomerCreated,
+        { user, customer },
+        "lifecycle.onCustomerCreated",
+        this.logger
+      );
+
+      return customer;
+    } catch (err) {
+      // Race condition: another request created the customer concurrently
+      const created = await this.adapter.customers.findByUserId(user.id, provider);
+      if (created) return created;
+      this.logger.error("Failed to create billing customer", {
+        userId: user.id,
+        providerCustomerId: providerCustomer.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Create a checkout session for a user.
+   * Creates a billing customer if one doesn't exist.
+   */
+  async createCheckout(user: BillingUser, input: CheckoutInput): Promise<CheckoutResult> {
+    const hooks = this.config.hooks;
+
+    const product = await this.billing.products.getProduct(input.productId);
+    if (!product) {
+      throw new BillingBadRequestError("Invalid product ID");
+    }
+
+    const hookCtx = { user, productId: input.productId };
+    await runBeforeHook(hooks?.api?.checkout?.before, hookCtx, "checkout.before", this.logger);
+
+    const customer = await this.getOrCreateCustomer(user);
+
+    const session = await this.billing.checkout.createCheckoutSession({
+      customerId: customer.providerCustomerId,
+      productId: input.productId,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+    });
+
+    this.logger.info("Created checkout session", {
+      userId: user.id,
+      productId: input.productId,
+    });
+
+    runAfterHook(hooks?.api?.checkout?.after, hookCtx, "checkout.after", this.logger);
+
+    return {
+      checkoutUrl: session.checkoutUrl,
+    };
+  }
+
+  /**
+   * Create a portal session for managing billing.
+   * Creates a billing customer if one doesn't exist.
+   */
+  async createPortal(user: BillingUser, returnUrl: string): Promise<PortalResult> {
+    const customer = await this.getOrCreateCustomer(user);
+
+    const session = await this.billing.checkout.createPortalSession(
+      customer.providerCustomerId,
+      returnUrl
+    );
+
+    return {
+      portalUrl: session.portalUrl,
+    };
+  }
+
+  /**
+   * Apply a provider mutation response directly to the local DB.
+   */
+  private async applyMutationResult(
+    subscriptionId: string,
+    result: BillingSubscription
+  ): Promise<void> {
+    await this.adapter.subscriptions.update(subscriptionId, {
+      status: result.status,
+      providerProductId: result.productId,
+      providerPriceId: result.priceId,
+      currentPeriodStart: result.currentPeriodStart,
+      currentPeriodEnd: result.currentPeriodEnd,
+      pendingCancellation: result.pendingCancellation,
+      canceledAt: result.canceledAt,
+      endedAt: result.endedAt,
+    });
+  }
+
+  /**
+   * Cancel a user's subscription.
+   * Uses config to determine cancel-at-period-end vs immediate.
+   */
+  async cancelSubscription(user: BillingUser, subscriptionId: string): Promise<void> {
+    const hooks = this.config.hooks;
+
+    const customer = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
+
+    if (!customer) {
+      throw new BillingNotFoundError("No billing account found");
+    }
+
+    const subscription = await this.adapter.subscriptions.findById(subscriptionId);
+
+    if (!subscription || subscription.customerId !== customer.id) {
+      throw new BillingNotFoundError("Subscription not found");
+    }
+
+    const cancelHookCtx = { user, customer, subscription };
+    await runBeforeHook(hooks?.api?.cancel?.before, cancelHookCtx, "cancel.before", this.logger);
+
+    const { timing } = this.config.subscriptions.cancellation;
+    const cancelAtPeriodEnd = timing === "at_period_end";
+
+    const result = await this.billing.customers.cancelSubscription(
+      subscription.providerSubscriptionId,
+      cancelAtPeriodEnd
+    );
+
+    await this.applyMutationResult(subscriptionId, result);
+
+    this.logger.info("Canceled subscription", {
+      userId: user.id,
+      subscriptionId,
+      timing,
+    });
+
+    runAfterHook(hooks?.api?.cancel?.after, cancelHookCtx, "cancel.after", this.logger);
+  }
+
+  /**
+   * Uncancel a subscription that's scheduled for cancellation.
+   * Guarded by config's allowUncancel setting.
+   */
+  async uncancelSubscription(user: BillingUser, subscriptionId: string): Promise<void> {
+    if (!this.config.subscriptions.cancellation.allowUncancel) {
+      throw new BillingBadRequestError("Resuming canceled subscriptions is not allowed");
+    }
+
+    const customer = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
+
+    if (!customer) {
+      throw new BillingNotFoundError("No billing account found");
+    }
+
+    const subscription = await this.adapter.subscriptions.findById(subscriptionId);
+
+    if (!subscription || subscription.customerId !== customer.id) {
+      throw new BillingNotFoundError("Subscription not found");
+    }
+
+    if (!subscription.pendingCancellation) {
+      throw new BillingBadRequestError("Subscription is not scheduled for cancellation");
+    }
+
+    const result = await this.billing.customers.uncancelSubscription(
+      subscription.providerSubscriptionId
+    );
+
+    await this.applyMutationResult(subscriptionId, result);
+
+    this.logger.info("Uncanceled subscription", {
+      userId: user.id,
+      subscriptionId,
+    });
+  }
+
+  /**
+   * Change a user's subscription to a different product.
+   */
+  async changeSubscription(user: BillingUser, input: ChangeSubscriptionInput): Promise<void> {
+    const subsConfig = this.config.subscriptions;
+    const hooks = this.config.hooks;
+
+    // 1. Validate product exists
+    const newProduct = await this.billing.products.getProduct(input.productId);
+    if (!newProduct) {
+      throw new BillingBadRequestError("Invalid product ID");
+    }
+
+    // 2. Load subscription + ownership check
+    const customer = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
+
+    if (!customer) {
+      throw new BillingNotFoundError("No billing account found");
+    }
+
+    const subscription = await this.adapter.subscriptions.findById(input.subscriptionId);
+
+    if (!subscription || subscription.customerId !== customer.id) {
+      throw new BillingNotFoundError("Subscription not found");
+    }
+
+    if (!isActive(subscription)) {
+      throw new BillingBadRequestError("Subscription is not active");
+    }
+
+    if (subscription.providerProductId === input.productId) {
+      throw new BillingBadRequestError("Already subscribed to this product");
+    }
+
+    // 3. Determine direction
+    const currentProduct = await this.billing.products.getProduct(subscription.providerProductId);
+    const currentPrice = currentProduct ? this.getLowestMonthlyPrice(currentProduct) : undefined;
+    const newPrice = this.getLowestMonthlyPrice(newProduct);
+
+    const direction = getChangeDirection(subscription.providerProductId, input.productId, {
+      tierOrder: subsConfig.tierOrder,
+      currentPrice,
+      newPrice,
+    });
+
+    // 4. Enforce allowUpgrade / allowDowngrade
+    if (direction === "upgrade" && !subsConfig.allowUpgrade) {
+      throw new BillingBadRequestError("Upgrades are not allowed");
+    }
+    if (direction === "downgrade" && !subsConfig.allowDowngrade) {
+      throw new BillingBadRequestError("Downgrades are not allowed");
+    }
+
+    // 5. Resolve strategy -> proration behavior
+    const strategy =
+      direction === "upgrade" ? subsConfig.upgradeStrategy : subsConfig.downgradeStrategy;
+    const useSchedule = direction === "downgrade" && strategy === "at_period_end";
+    const prorationBehavior = useSchedule ? undefined : strategyToProrationBehavior(strategy);
+
+    // 6. Before hook
+    const planChangeCtx = {
+      user,
+      customer,
+      subscription,
+      fromProductId: subscription.providerProductId,
+      toProductId: input.productId,
+      direction,
+      strategy,
+    };
+    await runBeforeHook(
+      hooks?.api?.planChange?.before,
+      planChangeCtx,
+      "planChange.before",
+      this.logger
+    );
+
+    // 7. Call provider
+    const result = await this.billing.customers.changeSubscription(
+      subscription.providerSubscriptionId,
+      {
+        productId: input.productId,
+        prorationBehavior,
+        scheduleAtPeriodEnd: useSchedule,
+      }
+    );
+
+    // 8. Apply mutation result
+    await this.applyMutationResult(input.subscriptionId, result);
+
+    this.logger.info("Changed subscription", {
+      userId: user.id,
+      subscriptionId: input.subscriptionId,
+      newProductId: input.productId,
+      direction,
+      strategy,
+    });
+
+    runAfterHook(hooks?.api?.planChange?.after, planChangeCtx, "planChange.after", this.logger);
+  }
+
+  /**
+   * Get the lowest monthly-equivalent price from a product's price list.
+   */
+  private getLowestMonthlyPrice(product: {
+    prices: { amount: number; interval: string }[];
+  }): number {
+    let lowest = Infinity;
+    for (const price of product.prices) {
+      const monthly = price.interval === "year" ? price.amount / 12 : price.amount;
+      if (monthly < lowest) lowest = monthly;
+    }
+    return lowest === Infinity ? 0 : lowest;
+  }
+}

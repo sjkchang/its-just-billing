@@ -1,0 +1,31 @@
+/**
+ * Mock billing provider factory.
+ */
+
+export { MockProductProvider } from "./products";
+export { MockCheckoutProvider } from "./checkout";
+export { MockCustomerProvider } from "./customers";
+export { MockWebhookProvider } from "./webhooks";
+
+import { MockState } from "./shared";
+import { MockProductProvider } from "./products";
+import { MockCheckoutProvider } from "./checkout";
+import { MockCustomerProvider } from "./customers";
+import { MockWebhookProvider } from "./webhooks";
+import type { BillingProviders } from "../types";
+import type { BillingLogger } from "../../types";
+import { defaultLogger } from "../../types";
+
+export function createMockProviders(logger?: BillingLogger): BillingProviders {
+  const log = logger ?? defaultLogger;
+  const state = new MockState();
+
+  log.info("Mock billing providers initialized");
+
+  return {
+    products: new MockProductProvider(log),
+    checkout: new MockCheckoutProvider(state, log),
+    customers: new MockCustomerProvider(state, log),
+    webhooks: new MockWebhookProvider(log),
+  };
+}
