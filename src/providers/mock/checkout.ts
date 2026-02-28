@@ -2,8 +2,8 @@
  * Mock checkout provider — auto-creates subscriptions for development.
  */
 
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 import type { MockState } from "./shared";
 import type {
   BillingCheckoutProvider,

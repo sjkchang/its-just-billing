@@ -37,7 +37,7 @@ export type {
   CustomerRepository,
   SubscriptionRepository,
   BillingEventRepository,
-} from "./repository";
+} from "./repositories/types";
 
 // Entities
 export {
@@ -46,7 +46,7 @@ export {
   Subscription,
   SubscriptionStatus,
   BillingEvent,
-} from "./entities";
+} from "./core/entities";
 
 // Domain
 export {
@@ -60,15 +60,15 @@ export {
   strategyToProrationBehavior,
   getStatusMessage,
   EntitlementResolver,
-} from "./domain";
-export type { Entitlement, EntitlementSet, EntitlementConfig } from "./domain";
+} from "./core/domain";
+export type { Entitlement, EntitlementSet, EntitlementConfig } from "./core/domain";
 
 // Config
-export { BillingConfigSchema } from "./config";
-export type { BillingAppConfig, CancellationConfig, SubscriptionStrategyConfig } from "./config";
+export { BillingConfigSchema } from "./core/config";
+export type { BillingAppConfig, CancellationConfig, SubscriptionStrategyConfig } from "./core/config";
 
 // Hook types + runners
-export { runBeforeHook, runAfterHook } from "./hooks";
+export { runBeforeHook, runAfterHook } from "./core/hooks";
 export type {
   BillingUser,
   BillingHooks,
@@ -80,14 +80,14 @@ export type {
   SubscriptionChangedContext,
   SubscriptionExpiredContext,
   CustomerCreatedContext,
-} from "./hooks";
+} from "./core/hooks";
 
 // Errors
-export { BillingError, BillingBadRequestError, BillingNotFoundError } from "./errors";
+export { BillingError, BillingBadRequestError, BillingNotFoundError } from "./core/errors";
 
 // Logger
-export type { BillingLogger } from "./types";
-export { defaultLogger } from "./types";
+export type { BillingLogger } from "./core/types";
+export { defaultLogger } from "./core/types";
 
 // Provider factory + types
 export { createBillingProviders } from "./providers";

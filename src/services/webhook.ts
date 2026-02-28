@@ -4,11 +4,11 @@
 
 import { nanoid } from "nanoid";
 import type { BillingProviders } from "../providers";
-import type { BillingProviderType } from "../entities";
-import type { BillingRepositories } from "../repository";
-import { BillingBadRequestError } from "../errors";
-import type { BillingLogger } from "../types";
-import { defaultLogger } from "../types";
+import type { BillingProviderType } from "../core/entities";
+import type { BillingRepositories } from "../repositories/types";
+import { BillingBadRequestError } from "../core/errors";
+import type { BillingLogger } from "../core/types";
+import { defaultLogger } from "../core/types";
 import type { BillingSyncService } from "./sync";
 
 export class BillingWebhookService {

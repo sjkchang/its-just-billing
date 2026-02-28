@@ -3,7 +3,7 @@
  */
 
 import type { Subscription, SubscriptionStatus } from "./entities";
-import type { ProrationBehavior } from "./providers/types";
+import type { ProrationBehavior } from "../providers/types";
 
 // ============================================================================
 // Subscription Status Logic

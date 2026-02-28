@@ -6,13 +6,13 @@
  */
 
 import type { BillingProviders, BillingProviderConfig } from "./providers";
-import type { BillingProviderType } from "./entities";
-import type { BillingAppConfig } from "./config";
-import { BillingConfigSchema } from "./config";
-import type { BillingRepositories } from "./repository";
-import type { BillingUser } from "./hooks";
-import type { BillingLogger } from "./types";
-import { defaultLogger } from "./types";
+import type { BillingProviderType } from "./core/entities";
+import type { BillingAppConfig } from "./core/config";
+import { BillingConfigSchema } from "./core/config";
+import type { BillingRepositories } from "./repositories/types";
+import type { BillingUser } from "./core/hooks";
+import type { BillingLogger } from "./core/types";
+import { defaultLogger } from "./core/types";
 import { createBillingProviders } from "./providers";
 
 import { BillingSyncService } from "./services/sync";

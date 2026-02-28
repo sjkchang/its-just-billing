@@ -7,14 +7,14 @@
 
 import { nanoid } from "nanoid";
 import type { BillingProviders } from "../providers";
-import type { BillingProviderType, Customer, Subscription } from "../entities";
-import { isActive, hasEnded } from "../domain";
-import type { BillingRepositories } from "../repository";
-import type { BillingAppConfig } from "../config";
-import { runAfterHook } from "../hooks";
-import type { BillingUser } from "../hooks";
-import type { BillingLogger } from "../types";
-import { defaultLogger } from "../types";
+import type { BillingProviderType, Customer, Subscription } from "../core/entities";
+import { isActive, hasEnded } from "../core/domain";
+import type { BillingRepositories } from "../repositories/types";
+import type { BillingAppConfig } from "../core/config";
+import { runAfterHook } from "../core/hooks";
+import type { BillingUser } from "../core/hooks";
+import type { BillingLogger } from "../core/types";
+import { defaultLogger } from "../core/types";
 
 export class BillingSyncService {
   constructor(

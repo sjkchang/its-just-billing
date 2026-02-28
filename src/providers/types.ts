@@ -9,7 +9,7 @@
  * fields like scheduleAtPeriodEnd and prorationBehavior are Stripe concepts.
  */
 
-import type { SubscriptionStatus } from "../entities";
+import type { SubscriptionStatus } from "../core/entities";
 
 // ============================================================================
 // Shared Types

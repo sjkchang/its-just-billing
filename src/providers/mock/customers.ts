@@ -2,8 +2,8 @@
  * Mock customer provider — in-memory customer CRUD for development.
  */
 
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 import type { MockState } from "./shared";
 import type {
   BillingCustomerProvider,

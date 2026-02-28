@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EntitlementResolver } from "../domain";
+import { EntitlementResolver } from "../core/domain";
 
 describe("EntitlementResolver", () => {
   describe("zero-config (no config)", () => {

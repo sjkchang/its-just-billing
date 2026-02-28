@@ -6,9 +6,9 @@
  */
 
 import { z } from "zod";
-import { BillingBadRequestError, BillingNotFoundError } from "./errors";
+import { BillingBadRequestError, BillingNotFoundError } from "./core/errors";
 import type { BillingInstance } from "./billing";
-import type { BillingUser } from "./hooks";
+import type { BillingUser } from "./core/hooks";
 import type { BillingStatusResult } from "./services/status";
 
 // ============================================================================

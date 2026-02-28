@@ -21,8 +21,8 @@ import { StripeCheckoutProvider } from "./checkout";
 import { StripeCustomerProvider } from "./customers";
 import { StripeWebhookProvider } from "./webhooks";
 import type { BillingProviders } from "../types";
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 
 export function createStripeProviders(config: {
   secretKey: string;

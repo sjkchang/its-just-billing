@@ -3,8 +3,8 @@
  */
 
 import type Stripe from "stripe";
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 import type { BillingWebhookProvider, WebhookResource } from "../types";
 
 const RELEVANT_EVENTS = new Set([

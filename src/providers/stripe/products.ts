@@ -3,8 +3,8 @@
  */
 
 import type Stripe from "stripe";
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 import { mapPriceInterval } from "./shared";
 import type { BillingProductProvider, BillingProduct, BillingPrice } from "../types";
 

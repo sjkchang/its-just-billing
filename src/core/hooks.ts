@@ -106,8 +106,12 @@ export interface BillingHooks {
    * Use for reliable reactions to state changes.
    */
   lifecycle?: {
-    onSubscriptionActivated?: (ctx: SubscriptionActivatedContext) => Promise<void>;
-    onSubscriptionCanceled?: (ctx: SubscriptionCanceledContext) => Promise<void>;
+    onSubscriptionActivated?: (
+      ctx: SubscriptionActivatedContext,
+    ) => Promise<void>;
+    onSubscriptionCanceled?: (
+      ctx: SubscriptionCanceledContext,
+    ) => Promise<void>;
     onSubscriptionChanged?: (ctx: SubscriptionChangedContext) => Promise<void>;
     onSubscriptionExpired?: (ctx: SubscriptionExpiredContext) => Promise<void>;
     onCustomerCreated?: (ctx: CustomerCreatedContext) => Promise<void>;
@@ -125,7 +129,7 @@ export async function runBeforeHook<T>(
   fn: ((ctx: T) => Promise<void>) | undefined,
   ctx: T,
   name: string,
-  logger: BillingLogger = defaultLogger
+  logger: BillingLogger = defaultLogger,
 ): Promise<void> {
   if (!fn) return;
   try {
@@ -134,7 +138,9 @@ export async function runBeforeHook<T>(
     logger.warn(`Before hook "${name}" threw`, { error });
     if (error instanceof BillingBadRequestError) throw error;
     throw new BillingBadRequestError(
-      error instanceof Error ? error.message : `Hook "${name}" rejected the operation`
+      error instanceof Error
+        ? error.message
+        : `Hook "${name}" rejected the operation`,
     );
   }
 }
@@ -146,7 +152,7 @@ export function runAfterHook<T>(
   fn: ((ctx: T) => Promise<void>) | undefined,
   ctx: T,
   name: string,
-  logger: BillingLogger = defaultLogger
+  logger: BillingLogger = defaultLogger,
 ): void {
   if (!fn) return;
   fn(ctx).catch((error) => {

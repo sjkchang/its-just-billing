@@ -9,8 +9,8 @@ import {
   getChangeDirection,
   strategyToProrationBehavior,
   getStatusMessage,
-} from "../domain";
-import type { Subscription, SubscriptionStatus } from "../entities";
+} from "../core/domain";
+import type { Subscription, SubscriptionStatus } from "../core/entities";
 
 function createTestSubscription(overrides: Partial<Subscription> = {}): Subscription {
   const now = new Date();

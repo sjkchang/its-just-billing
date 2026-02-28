@@ -4,15 +4,15 @@
 
 import { nanoid } from "nanoid";
 import type { BillingProviders, BillingSubscription } from "../providers";
-import type { BillingProviderType } from "../entities";
-import { isActive, getChangeDirection, strategyToProrationBehavior } from "../domain";
-import type { BillingRepositories } from "../repository";
-import type { BillingAppConfig } from "../config";
-import { runBeforeHook, runAfterHook } from "../hooks";
-import type { BillingUser } from "../hooks";
-import { BillingBadRequestError, BillingNotFoundError } from "../errors";
-import type { BillingLogger } from "../types";
-import { defaultLogger } from "../types";
+import type { BillingProviderType } from "../core/entities";
+import { isActive, getChangeDirection, strategyToProrationBehavior } from "../core/domain";
+import type { BillingRepositories } from "../repositories/types";
+import type { BillingAppConfig } from "../core/config";
+import { runBeforeHook, runAfterHook } from "../core/hooks";
+import type { BillingUser } from "../core/hooks";
+import { BillingBadRequestError, BillingNotFoundError } from "../core/errors";
+import type { BillingLogger } from "../core/types";
+import { defaultLogger } from "../core/types";
 
 export interface CheckoutInput {
   productId: string;

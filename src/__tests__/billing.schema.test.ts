@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BillingConfigSchema } from "../config";
+import { BillingConfigSchema } from "../core/config";
 
 describe("BillingConfigSchema", () => {
   describe("defaults", () => {

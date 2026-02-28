@@ -27,8 +27,8 @@ export type {
 } from "./types";
 
 import type { BillingProviderConfig, BillingProviders } from "./types";
-import type { BillingLogger } from "../types";
-import { defaultLogger } from "../types";
+import type { BillingLogger } from "../core/types";
+import { defaultLogger } from "../core/types";
 
 export async function createBillingProviders(
   config: BillingProviderConfig,

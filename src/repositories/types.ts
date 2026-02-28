@@ -5,9 +5,9 @@
  * Consumers provide a concrete implementation (e.g. drizzleRepositories) to createBilling().
  */
 
-import type { Customer, BillingProviderType } from "./entities";
-import type { Subscription, SubscriptionStatus } from "./entities";
-import type { BillingEvent } from "./entities";
+import type { Customer, BillingProviderType } from "../core/entities";
+import type { Subscription, SubscriptionStatus } from "../core/entities";
+import type { BillingEvent } from "../core/entities";
 
 // ============================================================================
 // Repository Interfaces

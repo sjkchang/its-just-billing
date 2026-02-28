@@ -3,10 +3,10 @@
  */
 
 import Stripe from "stripe";
-import type { SubscriptionStatus } from "../../entities";
+import type { SubscriptionStatus } from "../../core/entities";
 import type { BillingSubscription, ProrationBehavior } from "../types";
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 
 export function createStripeClient(secretKey: string, logger?: BillingLogger): Stripe {
   const log = logger ?? defaultLogger;

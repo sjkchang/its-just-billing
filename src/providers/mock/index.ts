@@ -13,8 +13,8 @@ import { MockCheckoutProvider } from "./checkout";
 import { MockCustomerProvider } from "./customers";
 import { MockWebhookProvider } from "./webhooks";
 import type { BillingProviders } from "../types";
-import type { BillingLogger } from "../../types";
-import { defaultLogger } from "../../types";
+import type { BillingLogger } from "../../core/types";
+import { defaultLogger } from "../../core/types";
 
 export function createMockProviders(logger?: BillingLogger): BillingProviders {
   const log = logger ?? defaultLogger;

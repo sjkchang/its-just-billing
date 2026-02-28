@@ -3,11 +3,11 @@
  */
 
 import type { BillingProviders } from "../providers";
-import type { BillingProviderType, Subscription, SubscriptionStatus } from "../entities";
-import { getActiveSubscription, getStatusMessage, EntitlementResolver } from "../domain";
-import type { BillingAppConfig } from "../config";
-import type { BillingRepositories } from "../repository";
-import type { BillingUser } from "../hooks";
+import type { BillingProviderType, Subscription, SubscriptionStatus } from "../core/entities";
+import { getActiveSubscription, getStatusMessage, EntitlementResolver } from "../core/domain";
+import type { BillingAppConfig } from "../core/config";
+import type { BillingRepositories } from "../repositories/types";
+import type { BillingUser } from "../core/hooks";
 
 export interface BillingStatusResult {
   entitlements: string[];
