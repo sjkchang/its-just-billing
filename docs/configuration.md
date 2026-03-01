@@ -5,7 +5,7 @@ All configuration is passed to `createBilling()`. Every field in `config` has se
 ## createBilling options
 
 ```ts
-import { createBilling } from "@kitforge/billing";
+import { createBilling } from "its-just-billing";
 
 const billing = await createBilling({
   // Required: database adapter

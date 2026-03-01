@@ -6,8 +6,8 @@ The billing handler is a standard `(Request) => Promise<Response>` function, whi
 
 ```ts
 import { Hono } from "hono";
-import { createBilling } from "@kitforge/billing";
-import { drizzleRepositories, createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+import { createBilling } from "its-just-billing";
+import { drizzleRepositories, createBillingSchema } from "its-just-billing/repositories/drizzle";
 
 const app = new Hono();
 
@@ -90,8 +90,8 @@ app.post("/api/v1/admin/provision", async (c) => {
 
 ```ts
 import { Hono } from "hono";
-import { createBilling } from "@kitforge/billing";
-import { drizzleRepositories, createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+import { createBilling } from "its-just-billing";
+import { drizzleRepositories, createBillingSchema } from "its-just-billing/repositories/drizzle";
 import { db } from "./db";
 import { users } from "./db/schema";
 

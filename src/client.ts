@@ -3,7 +3,7 @@
  *
  * @example
  * ```ts
- * import { createBillingClient } from "@kitforge/billing/client";
+ * import { createBillingClient } from "its-just-billing/client";
  * const billing = createBillingClient({ basePath: "/api/v1/billing" });
  * const status = await billing.getStatus();
  * ```

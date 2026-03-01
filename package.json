@@ -1,6 +1,6 @@
 {
-	"name": "@kitforge/billing",
-	"version": "1.0.0",
+	"name": "its-just-billing",
+	"version": "0.1.0",
 	"description": "Billing engine for KitForge — self-contained billing system with services, providers, and web standard handler",
 	"license": "MIT",
 	"type": "module",

@@ -1,12 +1,12 @@
-# @kitforge/billing
+# its-just-billing
 
 A self-contained billing engine with Stripe integration, subscription management, entitlements, and lifecycle hooks. Framework-agnostic — works with any server that handles `Request`/`Response`.
 
 ## Quick start
 
 ```ts
-import { createBilling } from "@kitforge/billing";
-import { drizzleRepositories, createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+import { createBilling } from "its-just-billing";
+import { drizzleRepositories, createBillingSchema } from "its-just-billing/repositories/drizzle";
 
 const billing = await createBilling({
   adapter: drizzleRepositories(db, billingSchema),
@@ -55,7 +55,7 @@ app.all("/api/v1/billing/*", (req) => billing.handler(req));
 └──────────────┬───────────────────────────┘
                │
 ┌──────────────▼───────────────────────────┐
-│          @kitforge/billing                │
+│          its-just-billing                │
 │                                           │
 │  ┌─────────┐  ┌──────────┐  ┌─────────┐  │
 │  │Services │  │ Provider │  │  Repos  │  │

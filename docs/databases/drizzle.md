@@ -15,7 +15,7 @@ The schema builder creates three tables (`billing_customers`, `billing_subscript
 ```ts
 // db/schema.ts
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+import { createBillingSchema } from "its-just-billing/repositories/drizzle";
 
 // Your existing users table
 export const users = pgTable("users", {
@@ -76,7 +76,7 @@ Pass your Drizzle `db` instance and the billing tables to `drizzleRepositories()
 ```ts
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { drizzleRepositories } from "@kitforge/billing/repositories/drizzle";
+import { drizzleRepositories } from "its-just-billing/repositories/drizzle";
 import { billingSchema } from "./db/schema";
 
 const client = postgres(process.env.DATABASE_URL!);
@@ -90,7 +90,7 @@ The adapter works with any Drizzle PostgreSQL driver — `postgres-js`, `node-po
 ## 3. Pass to createBilling
 
 ```ts
-import { createBilling } from "@kitforge/billing";
+import { createBilling } from "its-just-billing";
 
 const billing = await createBilling({
   adapter: drizzleRepositories(db, billingSchema),
@@ -114,7 +114,7 @@ export const db = drizzle(client, { schema });
 ```ts
 // db/schema.ts
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+import { createBillingSchema } from "its-just-billing/repositories/drizzle";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -129,8 +129,8 @@ export const { billingCustomers, billingSubscriptions, billingEvents } = billing
 
 ```ts
 // billing.ts
-import { createBilling } from "@kitforge/billing";
-import { drizzleRepositories } from "@kitforge/billing/repositories/drizzle";
+import { createBilling } from "its-just-billing";
+import { drizzleRepositories } from "its-just-billing/repositories/drizzle";
 import { db } from "./db";
 import { billingSchema } from "./db/schema";
 

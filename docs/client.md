@@ -5,7 +5,7 @@ A lightweight, typed `fetch`-based client for calling the billing HTTP API from 
 ## Setup
 
 ```ts
-import { createBillingClient } from "@kitforge/billing/client";
+import { createBillingClient } from "its-just-billing/client";
 
 const billing = createBillingClient({
   basePath: "/api/v1/billing",  // default
@@ -92,7 +92,7 @@ const status = await billing.changeSubscription(subscriptionId, "prod_pro");
 All methods throw `BillingClientError` on non-2xx responses:
 
 ```ts
-import { BillingClientError } from "@kitforge/billing/client";
+import { BillingClientError } from "its-just-billing/client";
 
 try {
   await billing.checkout({ productId: "invalid", successUrl: "..." });

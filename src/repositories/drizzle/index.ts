@@ -1,10 +1,10 @@
 /**
- * Drizzle repositories for @kitforge/billing.
+ * Drizzle repositories for its-just-billing.
  *
  * Provides the BillingRepositories implementation backed by Drizzle ORM.
  * Also re-exports schema builder and types so consumers import from one place:
  *
- *   import { drizzleRepositories, createBillingSchema } from "@kitforge/billing/repositories/drizzle";
+ *   import { drizzleRepositories, createBillingSchema } from "its-just-billing/repositories/drizzle";
  */
 
 export { DrizzleCustomerRepository } from "./customers";

@@ -1,13 +1,13 @@
 /**
- * @kitforge/billing — self-contained billing engine.
+ * its-just-billing — self-contained billing engine.
  *
  * Create an instance with createBilling(), mount with app.all(),
  * and use billing.api for server-side access.
  *
  * @example
  * ```ts
- * import { createBilling } from "@kitforge/billing";
- * import { drizzleRepositories } from "@kitforge/billing/repositories/drizzle";
+ * import { createBilling } from "its-just-billing";
+ * import { drizzleRepositories } from "its-just-billing/repositories/drizzle";
  *
  * const billing = await createBilling({
  *   adapter: drizzleRepositories(db, { billingCustomers, billingSubscriptions, billingEvents }),
