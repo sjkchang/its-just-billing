@@ -1,7 +1,7 @@
 {
 	"name": "its-just-billing",
 	"version": "0.1.0",
-	"description": "Billing engine for KitForge — self-contained billing system with services, providers, and web standard handler",
+	"description": "Self-contained billing engine with Stripe integration, subscription management, entitlements, and lifecycle hooks",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -10,22 +10,18 @@
 	"files": ["dist"],
 	"exports": {
 		".": {
-			"kitforge": "./src/index.ts",
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
 		},
 		"./client": {
-			"kitforge": "./src/client.ts",
 			"import": "./dist/client.js",
 			"types": "./dist/client.d.ts"
 		},
 		"./repositories/drizzle": {
-			"kitforge": "./src/repositories/drizzle/index.ts",
 			"import": "./dist/repositories/drizzle/index.js",
 			"types": "./dist/repositories/drizzle/index.d.ts"
 		},
 		"./providers/stripe": {
-			"kitforge": "./src/providers/stripe/index.ts",
 			"import": "./dist/providers/stripe/index.js",
 			"types": "./dist/providers/stripe/index.d.ts"
 		}
