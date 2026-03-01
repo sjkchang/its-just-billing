@@ -64,8 +64,15 @@ export {
 export type { Entitlement, EntitlementSet, EntitlementConfig } from "./core/domain";
 
 // Config
-export { BillingConfigSchema } from "./core/config";
-export type { BillingAppConfig, CancellationConfig, SubscriptionStrategyConfig } from "./core/config";
+export { BillingConfigSchema, isManagedProduct, getProductId, getManagedProducts, getConfiguredProductIds } from "./core/config";
+export type {
+  BillingAppConfig,
+  CancellationConfig,
+  SubscriptionStrategyConfig,
+  ProductConfig,
+  ProductEntry,
+  ProductPriceConfig,
+} from "./core/config";
 
 // Hook types + runners
 export { runBeforeHook, runAfterHook } from "./core/hooks";

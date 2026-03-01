@@ -27,11 +27,13 @@ export type {
 } from "./types";
 
 import type { BillingProviderConfig, BillingProviders } from "./types";
+import type { BillingAppConfig } from "../core/config";
 import type { BillingLogger } from "../core/types";
 import { defaultLogger } from "../core/types";
 
 export async function createBillingProviders(
   config: BillingProviderConfig,
+  billingConfig: BillingAppConfig,
   logger: BillingLogger = defaultLogger
 ): Promise<BillingProviders> {
   switch (config.provider) {
@@ -46,7 +48,7 @@ export async function createBillingProviders(
     case "mock":
     default: {
       const { createMockProviders } = await import("./mock");
-      return createMockProviders(logger);
+      return createMockProviders(logger, billingConfig.products);
     }
   }
 }

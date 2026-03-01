@@ -8,7 +8,7 @@
 import type { BillingProviders, BillingProviderConfig } from "./providers";
 import type { BillingProviderType } from "./core/entities";
 import type { BillingAppConfig } from "./core/config";
-import { BillingConfigSchema } from "./core/config";
+import { BillingConfigSchema, getManagedProducts } from "./core/config";
 import type { BillingRepositories } from "./repositories/types";
 import type { BillingUser } from "./core/hooks";
 import type { BillingLogger } from "./core/types";
@@ -143,7 +143,19 @@ export class BillingInstance {
     const config = BillingConfigSchema.parse(createConfig.config);
     const basePath = createConfig.basePath ?? "/api/v1/billing";
 
-    const billing = await createBillingProviders(createConfig.provider, logger);
+    const billing = await createBillingProviders(createConfig.provider, config, logger);
+
+    // Non-blocking product sync for Stripe provider (managed products only)
+    const managedProducts = config.products ? getManagedProducts(config.products) : [];
+    if (managedProducts.length > 0 && createConfig.provider.provider === "stripe") {
+      const { syncProducts } = await import("./services/product-sync");
+      await syncProducts(managedProducts, createConfig.provider.secretKey, logger)
+        .catch((err) => {
+          logger.warn("Product sync failed — continuing with existing Stripe state", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    }
 
     return new BillingInstance(
       billing,

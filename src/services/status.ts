@@ -5,7 +5,8 @@
 import type { BillingProviders } from "../providers";
 import type { BillingProviderType, Subscription, SubscriptionStatus } from "../core/entities";
 import { getActiveSubscription, getStatusMessage, EntitlementResolver } from "../core/domain";
-import type { BillingAppConfig } from "../core/config";
+import type { BillingAppConfig, ProductEntry } from "../core/config";
+import { getConfiguredProductIds } from "../core/config";
 import type { BillingRepositories } from "../repositories/types";
 import type { BillingUser } from "../core/hooks";
 
@@ -39,6 +40,8 @@ export interface ProductResult {
 
 export class BillingStatusService {
   private entitlementResolver: EntitlementResolver;
+  private configuredProducts: ProductEntry[] | undefined;
+  private productDisplay: "configured" | "all";
 
   constructor(
     private adapter: BillingRepositories,
@@ -47,6 +50,8 @@ export class BillingStatusService {
     config: BillingAppConfig
   ) {
     this.entitlementResolver = new EntitlementResolver(config.entitlements);
+    this.configuredProducts = config.products;
+    this.productDisplay = config.productDisplay;
   }
 
   /**
@@ -88,11 +93,16 @@ export class BillingStatusService {
 
   /**
    * List available products.
+   *
+   * Filtering depends on config:
+   * - No configured products → return all from provider
+   * - `productDisplay: "configured"` (default) → only configured product IDs
+   * - `productDisplay: "all"` → configured products first (in config order), then remaining
    */
   async listProducts(): Promise<ProductResult[]> {
     const productList = await this.billing.products.listProducts();
 
-    return productList.map((prod) => ({
+    const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
       id: prod.id,
       name: prod.name,
       description: prod.description,
@@ -103,7 +113,47 @@ export class BillingStatusService {
         interval: price.interval,
       })),
       metadata: prod.metadata,
-    }));
+    });
+
+    // No configured products → return all from provider
+    if (!this.configuredProducts?.length) {
+      return productList.map(toResult);
+    }
+
+    const configuredIds = getConfiguredProductIds(this.configuredProducts);
+    const productMap = new Map(productList.map((p) => [p.id, p]));
+
+    if (this.productDisplay === "all") {
+      // Configured products first (in config order), then remaining
+      const results: ProductResult[] = [];
+      const includedIds = new Set<string>();
+
+      for (const id of configuredIds) {
+        const product = productMap.get(id);
+        if (product) {
+          results.push(toResult(product));
+          includedIds.add(id);
+        }
+      }
+
+      for (const product of productList) {
+        if (!includedIds.has(product.id)) {
+          results.push(toResult(product));
+        }
+      }
+
+      return results;
+    }
+
+    // Default: "configured" — only configured product IDs, in config order
+    const results: ProductResult[] = [];
+    for (const id of configuredIds) {
+      const product = productMap.get(id);
+      if (product) {
+        results.push(toResult(product));
+      }
+    }
+    return results;
   }
 
   /**

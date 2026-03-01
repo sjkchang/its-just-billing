@@ -90,6 +90,122 @@ interface BillingLogger {
 
 The default logger writes to `console` with a `[billing]` prefix.
 
+## Products
+
+Products can be configured in several ways depending on how much control you need.
+
+### Product management modes
+
+#### 1. Fully managed (synced to Stripe)
+
+Define products with full config and they'll be synced to Stripe on startup. Product `id` values become Stripe product IDs directly.
+
+```ts
+config: {
+  products: [
+    {
+      id: "starter",
+      name: "Starter",
+      description: "For small teams",
+      prices: [
+        { amount: 1900, currency: "usd", interval: "month" },
+        { amount: 18240, currency: "usd", interval: "year" },
+      ],
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      description: "For growing teams",
+      prices: [
+        { amount: 4900, currency: "usd", interval: "month" },
+      ],
+      metadata: { popular: "true" },
+    },
+  ],
+}
+```
+
+#### 2. Reference by ID (no sync)
+
+If you already have products in Stripe (or prefer managing them via the dashboard), pass their IDs as strings. These products are fetched from the provider but never synced or modified.
+
+```ts
+config: {
+  products: ["prod_starter", "prod_pro", "prod_enterprise"],
+}
+```
+
+#### 3. Display all from provider
+
+Omit `products` entirely to return all active products from the provider. No sync, no filtering.
+
+```ts
+config: {
+  // products omitted — all provider products are returned
+}
+```
+
+#### 4. Mixed (managed + referenced)
+
+Combine full product configs with string references. Only fully managed products are synced to Stripe; string references are fetched as-is.
+
+```ts
+config: {
+  products: [
+    { id: "starter", name: "Starter", prices: [{ amount: 1900, currency: "usd", interval: "month" }] },
+    "prod_enterprise",  // existing Stripe product, not managed
+  ],
+}
+```
+
+### Product display mode
+
+By default, `listProducts()` only returns products listed in your config. Set `productDisplay: "all"` to also include any other active products from the provider (configured products are listed first, in config order).
+
+```ts
+config: {
+  products: ["prod_starter"],
+  productDisplay: "all",  // returns prod_starter first, then all other active products
+}
+```
+
+| `productDisplay` | Behavior |
+| --- | --- |
+| `"configured"` (default) | Only return products listed in `products`, in config order |
+| `"all"` | Configured products first (in config order), then remaining provider products |
+
+When `products` is omitted, all provider products are always returned regardless of `productDisplay`.
+
+### Sync behavior (Stripe)
+
+Only fully managed products (full config objects, not string IDs) are synced. On startup, each product is synced independently:
+
+1. **Product not found** — created with the config `id` as the Stripe product ID
+2. **Product archived** — reactivated and updated
+3. **Product exists** — name/description/metadata updated if different
+4. **Prices** — matched by `(amount, currency, interval)`. Missing prices are created, unmatched Stripe prices are archived. The first config price becomes `default_price`.
+
+Sync is **non-blocking** — if it fails, a warning is logged and the app continues with whatever state Stripe already has. Each product syncs independently so one failure doesn't block others.
+
+### Using with entitlements
+
+Products and entitlements are separate configs. Use the product `id` (or Stripe product ID for references) in your entitlements map:
+
+```ts
+config: {
+  products: [
+    { id: "starter", name: "Starter", prices: [{ amount: 1900, currency: "usd", interval: "month" }] },
+    "prod_pro",  // referenced by Stripe ID
+  ],
+  entitlements: {
+    products: {
+      starter: ["plan:paid", "feature:basic"],
+      prod_pro: ["plan:paid", "feature:basic", "feature:advanced"],
+    },
+  },
+}
+```
+
 ## Subscription strategy
 
 Controls how plan changes and cancellations behave.
@@ -257,19 +373,24 @@ const billing = await createBilling({
   basePath: "/api/v1/billing",
   webhookPath: "/api/v1/webhooks",
   config: {
+    products: [
+      { id: "starter", name: "Starter", prices: [{ amount: 1900, currency: "usd", interval: "month" }] },
+      { id: "pro", name: "Pro", prices: [{ amount: 4900, currency: "usd", interval: "month" }] },
+      { id: "enterprise", name: "Enterprise", prices: [{ amount: 19900, currency: "usd", interval: "month" }] },
+    ],
     subscriptions: {
       allowUpgrade: true,
       allowDowngrade: true,
       upgradeStrategy: "immediate_prorate",
       downgradeStrategy: "at_period_end",
       cancellation: { timing: "at_period_end", allowUncancel: true },
-      tierOrder: ["prod_starter", "prod_pro", "prod_enterprise"],
+      tierOrder: ["starter", "pro", "enterprise"],
     },
     entitlements: {
       products: {
-        "prod_starter": ["plan:paid", "feature:basic"],
-        "prod_pro": ["plan:paid", "feature:basic", "feature:advanced"],
-        "prod_enterprise": ["plan:paid", "feature:basic", "feature:advanced", "feature:enterprise"],
+        starter: ["plan:paid", "feature:basic"],
+        pro: ["plan:paid", "feature:basic", "feature:advanced"],
+        enterprise: ["plan:paid", "feature:basic", "feature:advanced", "feature:enterprise"],
       },
     },
     hooks: {
