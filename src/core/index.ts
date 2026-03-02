@@ -23,7 +23,6 @@ export {
   getActiveSubscription,
   daysUntilEnd,
   getChangeDirection,
-  strategyToProrationBehavior,
   getStatusMessage,
   EntitlementResolver,
 } from "./domain";

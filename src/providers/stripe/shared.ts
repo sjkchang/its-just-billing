@@ -4,7 +4,7 @@
 
 import Stripe from "stripe";
 import type { SubscriptionStatus } from "../../core/entities";
-import type { BillingSubscription, ProrationBehavior } from "../types";
+import type { BillingSubscription } from "../types";
 import type { BillingLogger } from "../../core/types";
 import { defaultLogger } from "../../core/types";
 
@@ -41,16 +41,6 @@ export function mapPriceInterval(
   if (interval === "month") return "month";
   if (interval === "year") return "year";
   return "one_time";
-}
-
-export function mapProrationBehavior(
-  behavior?: ProrationBehavior
-): Stripe.SubscriptionUpdateParams.ProrationBehavior | undefined {
-  if (!behavior) return undefined;
-  if (behavior === "prorate") return "create_prorations";
-  if (behavior === "invoice") return "always_invoice";
-  if (behavior === "none") return "none";
-  return undefined;
 }
 
 export function mapStripeSubscription(sub: Stripe.Subscription): BillingSubscription {

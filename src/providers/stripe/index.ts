@@ -11,7 +11,6 @@ export {
   mapStripeSubscription,
   mapSubscriptionStatus,
   mapPriceInterval,
-  mapProrationBehavior,
   resolveRecurringPriceId,
 } from "./shared";
 

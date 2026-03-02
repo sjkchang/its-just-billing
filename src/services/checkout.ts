@@ -9,7 +9,6 @@ import {
   isActive,
   getActiveSubscription,
   getChangeDirection,
-  strategyToProrationBehavior,
 } from "../core/domain";
 import type { BillingRepositories } from "../repositories/types";
 import type { BillingAppConfig } from "../core/config";
@@ -339,11 +338,9 @@ export class BillingCheckoutService {
       throw new BillingBadRequestError("Downgrades are not allowed");
     }
 
-    // 5. Resolve strategy -> proration behavior
+    // 5. Resolve strategy (sidegrades use upgrade strategy — immediate prorate by default)
     const strategy =
-      direction === "upgrade" ? subsConfig.upgradeStrategy : subsConfig.downgradeStrategy;
-    const useSchedule = direction === "downgrade" && strategy === "at_period_end";
-    const prorationBehavior = useSchedule ? undefined : strategyToProrationBehavior(strategy);
+      direction === "downgrade" ? subsConfig.downgradeStrategy : subsConfig.upgradeStrategy;
 
     // 6. Before hook
     const planChangeCtx = {
@@ -367,8 +364,8 @@ export class BillingCheckoutService {
       subscription.providerSubscriptionId,
       {
         productId: input.productId,
-        prorationBehavior,
-        scheduleAtPeriodEnd: useSchedule,
+        direction,
+        strategy,
       }
     );
 

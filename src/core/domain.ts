@@ -3,7 +3,6 @@
  */
 
 import type { Subscription, SubscriptionStatus } from "./entities";
-import type { ProrationBehavior } from "../providers/types";
 
 // ============================================================================
 // Subscription Status Logic
@@ -89,6 +88,7 @@ export function daysUntilEnd(subscription: Subscription | null): number | null {
 /**
  * Determine the direction of a plan change.
  * Uses tierOrder index if available, falls back to price comparison.
+ * Returns "sidegrade" when products differ but have equal tier/price.
  */
 export function getChangeDirection(
   currentProductId: string,
@@ -98,8 +98,8 @@ export function getChangeDirection(
     currentPrice?: number;
     newPrice?: number;
   }
-): "upgrade" | "downgrade" | "same" {
-  if (currentProductId === newProductId) return "same";
+): "upgrade" | "downgrade" | "sidegrade" {
+  if (currentProductId === newProductId) return "sidegrade";
 
   if (options.tierOrder && options.tierOrder.length > 0) {
     const currentIndex = options.tierOrder.indexOf(currentProductId);
@@ -108,7 +108,7 @@ export function getChangeDirection(
     if (currentIndex !== -1 && newIndex !== -1) {
       if (newIndex > currentIndex) return "upgrade";
       if (newIndex < currentIndex) return "downgrade";
-      return "same";
+      return "sidegrade";
     }
   }
 
@@ -116,27 +116,11 @@ export function getChangeDirection(
   if (options.currentPrice !== undefined && options.newPrice !== undefined) {
     if (options.newPrice > options.currentPrice) return "upgrade";
     if (options.newPrice < options.currentPrice) return "downgrade";
-    return "same";
+    return "sidegrade";
   }
 
   // No way to determine — treat as upgrade (allow change, provider handles billing)
   return "upgrade";
-}
-
-/**
- * Map a subscription strategy name to a ProrationBehavior.
- */
-export function strategyToProrationBehavior(
-  strategy: "immediate_prorate" | "immediate_full" | "at_period_end"
-): ProrationBehavior {
-  switch (strategy) {
-    case "immediate_prorate":
-      return "prorate";
-    case "immediate_full":
-      return "invoice";
-    case "at_period_end":
-      return "none";
-  }
 }
 
 /**

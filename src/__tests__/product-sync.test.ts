@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ProductConfig } from "../core/config";
 import type { BillingLogger } from "../core/types";
+import { StripeProductProvider } from "../providers/stripe/products";
 
 // Mock Stripe SDK
 const mockStripe = {
@@ -8,6 +9,7 @@ const mockStripe = {
     retrieve: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    list: vi.fn(),
   },
   prices: {
     list: vi.fn(),
@@ -15,10 +17,6 @@ const mockStripe = {
     update: vi.fn(),
   },
 };
-
-vi.mock("stripe", () => ({
-  default: vi.fn(() => mockStripe),
-}));
 
 const logger: BillingLogger = {
   debug: vi.fn(),
@@ -34,14 +32,17 @@ const baseProduct: ProductConfig = {
   prices: [{ amount: 1900, currency: "usd", interval: "month" }],
 };
 
-describe("syncProducts", () => {
+describe("StripeProductProvider.syncProducts", () => {
+  let provider: StripeProductProvider;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    provider = new StripeProductProvider(mockStripe as any, logger);
   });
 
   async function runSync(products: ProductConfig[]) {
-    const { syncProducts } = await import("../services/product-sync");
-    return syncProducts(products, "sk_test_123", logger);
+    return provider.syncProducts(products);
   }
 
   describe("product creation", () => {

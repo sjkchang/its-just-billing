@@ -149,13 +149,12 @@ export class BillingInstance {
 
     const billing = await createBillingProviders(createConfig.provider, config, logger);
 
-    // Non-blocking product sync for Stripe provider (managed products only)
+    // Non-blocking product sync (only for providers that support it)
     const managedProducts = config.products ? getManagedProducts(config.products) : [];
-    if (managedProducts.length > 0 && createConfig.provider.provider === "stripe") {
-      const { syncProducts } = await import("./services/product-sync");
-      await syncProducts(managedProducts, createConfig.provider.secretKey, logger)
+    if (managedProducts.length > 0 && billing.products.syncProducts) {
+      await billing.products.syncProducts(managedProducts)
         .catch((err) => {
-          logger.warn("Product sync failed — continuing with existing Stripe state", {
+          logger.warn("Product sync failed — continuing with existing provider state", {
             error: err instanceof Error ? err.message : String(err),
           });
         });

@@ -1,15 +1,13 @@
 /**
  * Billing provider interfaces and shared types.
  *
- * These interfaces are modeled on Stripe's billing API surface. The mock
- * provider implements them for testing (instant checkout, in-memory state)
- * but doesn't simulate Stripe-specific behaviors like schedules or prorations.
- *
- * If you add a non-Stripe provider, expect to reshape these interfaces —
- * fields like scheduleAtPeriodEnd and prorationBehavior are Stripe concepts.
+ * These interfaces define a provider-agnostic billing surface. Each provider
+ * (Stripe, mock, etc.) implements the interfaces and maps the generic
+ * concepts (e.g. ChangeStrategy) to its own API.
  */
 
 import type { SubscriptionStatus } from "../core/entities";
+import type { ProductConfig } from "../core/config";
 
 // ============================================================================
 // Shared Types
@@ -82,14 +80,16 @@ export interface WebhookResource {
   customerId: string;
 }
 
-export type ProrationBehavior = "prorate" | "invoice" | "none";
+/**
+ * High-level strategy for subscription plan changes.
+ * Each provider maps these to its own API (e.g. Stripe prorations / schedules).
+ */
+export type SubscriptionChangeStrategy = "immediate_prorate" | "immediate_full" | "at_period_end";
 
 export interface ChangeSubscriptionOptions {
   productId: string;
-  /** Stripe-specific: how to handle mid-cycle billing adjustments. */
-  prorationBehavior?: ProrationBehavior;
-  /** Stripe-specific: defer the change to the next billing period via a subscription schedule. */
-  scheduleAtPeriodEnd?: boolean;
+  direction: "upgrade" | "downgrade" | "sidegrade";
+  strategy: SubscriptionChangeStrategy;
 }
 
 // ============================================================================
@@ -99,6 +99,8 @@ export interface ChangeSubscriptionOptions {
 export interface BillingProductProvider {
   listProducts(): Promise<BillingProduct[]>;
   getProduct(productId: string): Promise<BillingProduct | null>;
+  /** Sync managed product definitions to the provider. Not all providers support this. */
+  syncProducts?(products: ProductConfig[]): Promise<void>;
 }
 
 export interface BillingCheckoutProvider {

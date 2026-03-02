@@ -44,7 +44,7 @@ export interface PlanChangeHookContext {
   subscription: Subscription;
   fromProductId: string;
   toProductId: string;
-  direction: "upgrade" | "downgrade" | "same";
+  direction: "upgrade" | "downgrade" | "sidegrade";
   strategy: "immediate_prorate" | "immediate_full" | "at_period_end";
 }
 

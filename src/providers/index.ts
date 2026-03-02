@@ -15,7 +15,7 @@ export type {
   PortalSession,
   CheckoutOptions,
   WebhookResource,
-  ProrationBehavior,
+  SubscriptionChangeStrategy,
   ChangeSubscriptionOptions,
   BillingProductProvider,
   BillingCheckoutProvider,

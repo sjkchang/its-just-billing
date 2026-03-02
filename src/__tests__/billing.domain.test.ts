@@ -7,7 +7,6 @@ import {
   getActiveSubscription,
   daysUntilEnd,
   getChangeDirection,
-  strategyToProrationBehavior,
   getStatusMessage,
 } from "../core/domain";
 import type { Subscription, SubscriptionStatus } from "../core/entities";
@@ -226,8 +225,8 @@ describe("BillingDomain", () => {
   });
 
   describe("getChangeDirection", () => {
-    it("returns 'same' for identical product IDs", () => {
-      expect(getChangeDirection("prod_a", "prod_a", {})).toBe("same");
+    it("returns 'sidegrade' for identical product IDs", () => {
+      expect(getChangeDirection("prod_a", "prod_a", {})).toBe("sidegrade");
     });
 
     describe("with tierOrder", () => {
@@ -271,32 +270,18 @@ describe("BillingDomain", () => {
         ).toBe("downgrade");
       });
 
-      it("returns 'same' when prices are equal", () => {
+      it("returns 'sidegrade' when prices are equal", () => {
         expect(
           getChangeDirection("prod_a", "prod_b", {
             currentPrice: 10,
             newPrice: 10,
           })
-        ).toBe("same");
+        ).toBe("sidegrade");
       });
     });
 
     it("returns 'upgrade' when no way to determine direction", () => {
       expect(getChangeDirection("prod_a", "prod_b", {})).toBe("upgrade");
-    });
-  });
-
-  describe("strategyToProrationBehavior", () => {
-    it("maps immediate_prorate to prorate", () => {
-      expect(strategyToProrationBehavior("immediate_prorate")).toBe("prorate");
-    });
-
-    it("maps immediate_full to invoice", () => {
-      expect(strategyToProrationBehavior("immediate_full")).toBe("invoice");
-    });
-
-    it("maps at_period_end to none", () => {
-      expect(strategyToProrationBehavior("at_period_end")).toBe("none");
     });
   });
 

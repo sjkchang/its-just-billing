@@ -5,13 +5,14 @@
 import type Stripe from "stripe";
 import type { BillingLogger } from "../../core/types";
 import { defaultLogger } from "../../core/types";
-import { mapStripeSubscription, mapProrationBehavior, resolveRecurringPriceId } from "./shared";
+import { mapStripeSubscription, resolveRecurringPriceId } from "./shared";
 import type {
   BillingCustomerProvider,
   BillingCustomer,
   BillingSubscription,
   CustomerState,
   ChangeSubscriptionOptions,
+  SubscriptionChangeStrategy,
 } from "../types";
 
 function mapStripeCustomer(customer: Stripe.Customer): BillingCustomer {
@@ -22,6 +23,19 @@ function mapStripeCustomer(customer: Stripe.Customer): BillingCustomer {
     externalId: (customer.metadata?.externalId as string) ?? null,
     metadata: customer.metadata as Record<string, string> | undefined,
   };
+}
+
+function strategyToStripeProration(
+  strategy: import("../types").SubscriptionChangeStrategy
+): Stripe.SubscriptionUpdateParams.ProrationBehavior {
+  switch (strategy) {
+    case "immediate_prorate":
+      return "create_prorations";
+    case "immediate_full":
+      return "always_invoice";
+    case "at_period_end":
+      return "none";
+  }
 }
 
 export class StripeCustomerProvider implements BillingCustomerProvider {
@@ -173,7 +187,7 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
     options: ChangeSubscriptionOptions
   ): Promise<BillingSubscription> {
     try {
-      if (options.scheduleAtPeriodEnd) {
+      if (options.strategy === "at_period_end") {
         return await this.scheduleChangeAtPeriodEnd(subscriptionId, options.productId);
       }
 
@@ -198,13 +212,14 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
 
       const sub = await this.stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: priceId }],
-        proration_behavior: mapProrationBehavior(options.prorationBehavior),
+        proration_behavior: strategyToStripeProration(options.strategy),
       });
 
       this.logger.info("Updated subscription", {
         subscriptionId,
         newProductId: options.productId,
-        prorationBehavior: options.prorationBehavior,
+        direction: options.direction,
+        strategy: options.strategy,
       });
 
       return mapStripeSubscription(sub);

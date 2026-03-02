@@ -132,7 +132,8 @@ export class MockCustomerProvider implements BillingCustomerProvider {
     this.logger.debug("[Mock Billing] Updated subscription", {
       subscriptionId,
       newProductId: options.productId,
-      prorationBehavior: options.prorationBehavior,
+      direction: options.direction,
+      strategy: options.strategy,
     });
     return updated;
   }

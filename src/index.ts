@@ -57,7 +57,6 @@ export {
   getActiveSubscription,
   daysUntilEnd,
   getChangeDirection,
-  strategyToProrationBehavior,
   getStatusMessage,
   EntitlementResolver,
 } from "./core/domain";
@@ -109,7 +108,7 @@ export type {
   PortalSession,
   CheckoutOptions,
   WebhookResource,
-  ProrationBehavior,
+  SubscriptionChangeStrategy,
   ChangeSubscriptionOptions,
   BillingProductProvider,
   BillingCheckoutProvider,
