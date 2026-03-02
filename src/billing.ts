@@ -11,7 +11,7 @@ import type { BillingAppConfig } from "./core/config";
 import { BillingConfigSchema, getManagedProducts } from "./core/config";
 import type { BillingRepositories } from "./repositories/types";
 import type { BillingUser } from "./core/hooks";
-import type { BillingLogger } from "./core/types";
+import type { BillingLogger, KeyValueCache } from "./core/types";
 import { defaultLogger } from "./core/types";
 import { createBillingProviders } from "./providers";
 
@@ -36,6 +36,7 @@ export interface CreateBillingConfig {
   webhookPath?: string;
   config?: Partial<BillingAppConfig>;
   logger?: BillingLogger;
+  cache?: KeyValueCache;
 }
 
 // ============================================================================
@@ -90,21 +91,23 @@ export class BillingInstance {
     resolveUser: (req: Request) => Promise<BillingUser | null>,
     basePath: string,
     webhookPath: string | undefined,
-    logger: BillingLogger
+    logger: BillingLogger,
+    cache?: KeyValueCache
   ) {
     this.resolveUser = resolveUser;
 
     // Create services
-    this.syncService = new BillingSyncService(adapter, billing, billingProvider, config, logger);
+    this.syncService = new BillingSyncService(adapter, billing, billingProvider, config, logger, cache);
 
-    this.statusService = new BillingStatusService(adapter, billing, billingProvider, config);
+    this.statusService = new BillingStatusService(adapter, billing, billingProvider, config, cache, logger);
 
     this.checkoutService = new BillingCheckoutService(
       adapter,
       billing,
       billingProvider,
       config,
-      logger
+      logger,
+      cache
     );
 
     this.webhookService = new BillingWebhookService(
@@ -165,7 +168,8 @@ export class BillingInstance {
       createConfig.resolveUser,
       basePath,
       createConfig.webhookPath,
-      logger
+      logger,
+      createConfig.cache
     );
   }
 }

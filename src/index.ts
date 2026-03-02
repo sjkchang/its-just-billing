@@ -92,8 +92,8 @@ export type {
 // Errors
 export { BillingError, BillingBadRequestError, BillingNotFoundError } from "./core/errors";
 
-// Logger
-export type { BillingLogger } from "./core/types";
+// Logger & infrastructure
+export type { BillingLogger, KeyValueCache } from "./core/types";
 export { defaultLogger } from "./core/types";
 
 // Provider factory + types

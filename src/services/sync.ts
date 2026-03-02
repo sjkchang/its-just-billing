@@ -13,7 +13,7 @@ import type { BillingRepositories } from "../repositories/types";
 import type { BillingAppConfig } from "../core/config";
 import { runAfterHook } from "../core/hooks";
 import type { BillingUser } from "../core/hooks";
-import type { BillingLogger } from "../core/types";
+import type { BillingLogger, KeyValueCache } from "../core/types";
 import { defaultLogger } from "../core/types";
 
 export class BillingSyncService {
@@ -22,7 +22,8 @@ export class BillingSyncService {
     private billing: BillingProviders,
     private billingProvider: BillingProviderType,
     private config: BillingAppConfig,
-    private logger: BillingLogger = defaultLogger
+    private logger: BillingLogger = defaultLogger,
+    private cache?: KeyValueCache
   ) {}
 
   /**
@@ -161,9 +162,23 @@ export class BillingSyncService {
       });
     });
 
+    const resolvedCustomer = syncedCustomer as Customer | null;
+
+    // Invalidate status cache after sync
+    if (resolvedCustomer && this.cache) {
+      try {
+        await this.cache.delete(`billing:status:${resolvedCustomer.userId}`);
+      } catch (err) {
+        this.logger.warn("Failed to invalidate status cache after sync", {
+          userId: resolvedCustomer.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     // Fire subscription lifecycle hooks outside the transaction
-    if (syncedCustomer) {
-      this.fireTransitionHooks(syncedCustomer, preSubs);
+    if (resolvedCustomer) {
+      this.fireTransitionHooks(resolvedCustomer, preSubs);
     }
   }
 

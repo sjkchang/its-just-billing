@@ -5,13 +5,18 @@
 import { nanoid } from "nanoid";
 import type { BillingProviders, BillingSubscription } from "../providers";
 import type { BillingProviderType } from "../core/entities";
-import { isActive, getChangeDirection, strategyToProrationBehavior } from "../core/domain";
+import {
+  isActive,
+  getActiveSubscription,
+  getChangeDirection,
+  strategyToProrationBehavior,
+} from "../core/domain";
 import type { BillingRepositories } from "../repositories/types";
 import type { BillingAppConfig } from "../core/config";
 import { runBeforeHook, runAfterHook } from "../core/hooks";
 import type { BillingUser } from "../core/hooks";
 import { BillingBadRequestError, BillingNotFoundError } from "../core/errors";
-import type { BillingLogger } from "../core/types";
+import type { BillingLogger, KeyValueCache } from "../core/types";
 import { defaultLogger } from "../core/types";
 
 export interface CheckoutInput {
@@ -39,8 +44,24 @@ export class BillingCheckoutService {
     private billing: BillingProviders,
     private billingProvider: BillingProviderType,
     private config: BillingAppConfig,
-    private logger: BillingLogger = defaultLogger
+    private logger: BillingLogger = defaultLogger,
+    private cache?: KeyValueCache
   ) {}
+
+  /**
+   * Invalidate cached billing status for a user. Failures are logged and swallowed.
+   */
+  private async invalidateStatusCache(userId: string): Promise<void> {
+    if (!this.cache) return;
+    try {
+      await this.cache.delete(`billing:status:${userId}`);
+    } catch (err) {
+      this.logger.warn("Failed to invalidate status cache", {
+        userId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   /**
    * Get or create a billing customer for the user.
@@ -109,6 +130,16 @@ export class BillingCheckoutService {
     const hookCtx = { user, productId: input.productId };
     await runBeforeHook(hooks?.api?.checkout?.before, hookCtx, "checkout.before", this.logger);
 
+    if (this.config.subscriptions.singleSubscription) {
+      const existing = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
+      if (existing) {
+        const subs = await this.adapter.subscriptions.findByCustomerId(existing.id);
+        if (getActiveSubscription(subs)) {
+          throw new BillingBadRequestError("You already have an active subscription");
+        }
+      }
+    }
+
     const customer = await this.getOrCreateCustomer(user);
 
     const session = await this.billing.checkout.createCheckoutSession({
@@ -116,12 +147,15 @@ export class BillingCheckoutService {
       productId: input.productId,
       successUrl: input.successUrl,
       cancelUrl: input.cancelUrl,
+      trialDays: this.config.subscriptions.trialDays,
     });
 
     this.logger.info("Created checkout session", {
       userId: user.id,
       productId: input.productId,
     });
+
+    await this.invalidateStatusCache(user.id);
 
     runAfterHook(hooks?.api?.checkout?.after, hookCtx, "checkout.after", this.logger);
 
@@ -204,6 +238,8 @@ export class BillingCheckoutService {
       timing,
     });
 
+    await this.invalidateStatusCache(user.id);
+
     runAfterHook(hooks?.api?.cancel?.after, cancelHookCtx, "cancel.after", this.logger);
   }
 
@@ -242,6 +278,8 @@ export class BillingCheckoutService {
       userId: user.id,
       subscriptionId,
     });
+
+    await this.invalidateStatusCache(user.id);
   }
 
   /**
@@ -340,6 +378,8 @@ export class BillingCheckoutService {
       direction,
       strategy,
     });
+
+    await this.invalidateStatusCache(user.id);
 
     runAfterHook(hooks?.api?.planChange?.after, planChangeCtx, "planChange.after", this.logger);
   }

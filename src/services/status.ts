@@ -9,6 +9,8 @@ import type { BillingAppConfig, ProductEntry } from "../core/config";
 import { getConfiguredProductIds } from "../core/config";
 import type { BillingRepositories } from "../repositories/types";
 import type { BillingUser } from "../core/hooks";
+import type { BillingLogger, KeyValueCache } from "../core/types";
+import { defaultLogger } from "../core/types";
 
 export interface BillingStatusResult {
   entitlements: string[];
@@ -47,7 +49,9 @@ export class BillingStatusService {
     private adapter: BillingRepositories,
     private billing: BillingProviders,
     private billingProvider: BillingProviderType,
-    config: BillingAppConfig
+    config: BillingAppConfig,
+    private cache?: KeyValueCache,
+    private logger: BillingLogger = defaultLogger
   ) {
     this.entitlementResolver = new EntitlementResolver(config.entitlements);
     this.configuredProducts = config.products;
@@ -59,6 +63,28 @@ export class BillingStatusService {
    * Reads from local cache only — sync happens via webhooks or manual refresh.
    */
   async getBillingStatus(user: BillingUser): Promise<BillingStatusResult> {
+    const cacheKey = `billing:status:${user.id}`;
+
+    // Check cache
+    if (this.cache) {
+      try {
+        const cached = await this.cache.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached) as BillingStatusResult;
+          // Reconstruct Date from serialized string
+          if (parsed.subscription?.currentPeriodEnd) {
+            parsed.subscription.currentPeriodEnd = new Date(parsed.subscription.currentPeriodEnd);
+          }
+          return parsed;
+        }
+      } catch (err) {
+        this.logger.warn("Failed to read billing status from cache", {
+          userId: user.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const customer = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
     let activeSubscription: Subscription | null = null;
 
@@ -68,14 +94,16 @@ export class BillingStatusService {
     }
 
     if (!activeSubscription) {
-      return this.buildFreeStatus();
+      const result = this.buildFreeStatus();
+      await this.cacheSet(cacheKey, result);
+      return result;
     }
 
     const product = await this.billing.products.getProduct(activeSubscription.providerProductId);
 
     const entitlements = this.entitlementResolver.resolve([activeSubscription.providerProductId]);
 
-    return {
+    const result: BillingStatusResult = {
       entitlements: Array.from(entitlements),
       productId: activeSubscription.providerProductId,
       productName: product?.name ?? null,
@@ -89,6 +117,9 @@ export class BillingStatusService {
       statusMessage: getStatusMessage(activeSubscription),
       metadata: product?.metadata ?? null,
     };
+
+    await this.cacheSet(cacheKey, result);
+    return result;
   }
 
   /**
@@ -100,6 +131,22 @@ export class BillingStatusService {
    * - `productDisplay: "all"` → configured products first (in config order), then remaining
    */
   async listProducts(): Promise<ProductResult[]> {
+    const cacheKey = "billing:products";
+
+    // Check cache
+    if (this.cache) {
+      try {
+        const cached = await this.cache.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached) as ProductResult[];
+        }
+      } catch (err) {
+        this.logger.warn("Failed to read products from cache", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const productList = await this.billing.products.listProducts();
 
     const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
@@ -117,7 +164,9 @@ export class BillingStatusService {
 
     // No configured products → return all from provider
     if (!this.configuredProducts?.length) {
-      return productList.map(toResult);
+      const results = productList.map(toResult);
+      await this.cacheSet(cacheKey, results, 3600);
+      return results;
     }
 
     const configuredIds = getConfiguredProductIds(this.configuredProducts);
@@ -142,6 +191,7 @@ export class BillingStatusService {
         }
       }
 
+      await this.cacheSet(cacheKey, results, 3600);
       return results;
     }
 
@@ -153,7 +203,23 @@ export class BillingStatusService {
         results.push(toResult(product));
       }
     }
+    await this.cacheSet(cacheKey, results, 3600);
     return results;
+  }
+
+  /**
+   * Write a value to the cache. Failures are logged and swallowed.
+   */
+  private async cacheSet(key: string, value: unknown, ttl = 300): Promise<void> {
+    if (!this.cache) return;
+    try {
+      await this.cache.set(key, JSON.stringify(value), ttl);
+    } catch (err) {
+      this.logger.warn("Failed to write to cache", {
+        key,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**
