@@ -36,7 +36,7 @@ export interface ProductResponse {
     id: string;
     amount: number;
     currency: string;
-    interval: "month" | "year" | "one_time";
+    interval: "day" | "week" | "month" | "year" | "one_time";
   }[];
   metadata?: Record<string, string>;
 }

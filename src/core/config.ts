@@ -65,6 +65,8 @@ export const BillingConfigSchema = z
     subscriptions: SubscriptionStrategySchema,
     entitlements: z.custom<EntitlementConfig>().optional(),
     hooks: z.custom<BillingHooks>().optional(),
+    /** Restrict checkout/portal redirect URLs to these origins (e.g. ["https://example.com"]). */
+    allowedRedirectOrigins: z.array(z.string().min(1)).optional(),
   })
   .default({});
 

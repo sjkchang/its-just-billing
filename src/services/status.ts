@@ -35,7 +35,7 @@ export interface ProductResult {
     id: string;
     amount: number;
     currency: string;
-    interval: "month" | "year" | "one_time";
+    interval: "day" | "week" | "month" | "year" | "one_time";
   }[];
   metadata?: Record<string, string>;
 }
@@ -149,7 +149,7 @@ export class BillingStatusService {
 
     const productList = await this.billing.products.listProducts();
 
-    const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
+    const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "day" | "week" | "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
       id: prod.id,
       name: prod.name,
       description: prod.description,

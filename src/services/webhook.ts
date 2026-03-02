@@ -1,5 +1,9 @@
 /**
  * Billing webhook service — handles webhook verification and processing.
+ *
+ * Deduplication strategy:
+ * - When a cache is provided, uses cache-based dedup (no DB writes needed).
+ * - Otherwise, falls back to the billing_events table for persistence.
  */
 
 import { nanoid } from "nanoid";
@@ -7,9 +11,12 @@ import type { BillingProviders } from "../providers";
 import type { BillingProviderType } from "../core/entities";
 import type { BillingRepositories } from "../repositories/types";
 import { BillingBadRequestError } from "../core/errors";
-import type { BillingLogger } from "../core/types";
+import type { BillingLogger, KeyValueCache } from "../core/types";
 import { defaultLogger } from "../core/types";
 import type { BillingSyncService } from "./sync";
+
+/** Cache TTL for webhook dedup keys (24 hours). */
+const WEBHOOK_DEDUP_TTL_SECONDS = 86_400;
 
 export class BillingWebhookService {
   constructor(
@@ -17,7 +24,8 @@ export class BillingWebhookService {
     private syncService: BillingSyncService,
     private billing: BillingProviders,
     private billingProvider: BillingProviderType,
-    private logger: BillingLogger = defaultLogger
+    private logger: BillingLogger = defaultLogger,
+    private cache?: KeyValueCache
   ) {}
 
   /**
@@ -41,27 +49,11 @@ export class BillingWebhookService {
       return;
     }
 
-    const alreadyProcessed = await this.adapter.events.exists(resource.eventId);
-    if (alreadyProcessed) {
-      this.logger.debug("Webhook event already processed", { eventId: resource.eventId });
-      return;
-    }
+    const claimed = this.cache
+      ? await this.claimViaCache(resource.eventId)
+      : await this.claimViaDb(resource.eventId, resource.eventType);
 
-    try {
-      await this.adapter.events.create({
-        id: nanoid(),
-        provider: this.billingProvider,
-        providerEventId: resource.eventId,
-        eventType: resource.eventType,
-        payload,
-      });
-    } catch {
-      // Unique constraint violation — another request already claimed this event
-      this.logger.debug("Webhook event already processed (concurrent)", {
-        eventId: resource.eventId,
-      });
-      return;
-    }
+    if (!claimed) return;
 
     await this.syncService.syncCustomerState(resource.customerId, this.billingProvider);
 
@@ -70,5 +62,53 @@ export class BillingWebhookService {
       eventType: resource.eventType,
       customerId: resource.customerId,
     });
+  }
+
+  /**
+   * Attempt to claim an event via cache (set-if-absent pattern).
+   * Returns true if this process should handle the event.
+   */
+  private async claimViaCache(eventId: string): Promise<boolean> {
+    const key = `billing:webhook:dedup:${eventId}`;
+    try {
+      const existing = await this.cache!.get(key);
+      if (existing) {
+        this.logger.debug("Webhook event already processed (cache)", { eventId });
+        return false;
+      }
+      await this.cache!.set(key, "1", WEBHOOK_DEDUP_TTL_SECONDS);
+      return true;
+    } catch {
+      // Cache failure — allow processing to avoid dropping events
+      this.logger.warn("Webhook dedup cache error, proceeding with event", { eventId });
+      return true;
+    }
+  }
+
+  /**
+   * Attempt to claim an event via the billing_events DB table.
+   * Falls back to unique constraint for concurrency safety.
+   */
+  private async claimViaDb(eventId: string, eventType: string): Promise<boolean> {
+    const alreadyProcessed = await this.adapter.events.exists(eventId);
+    if (alreadyProcessed) {
+      this.logger.debug("Webhook event already processed", { eventId });
+      return false;
+    }
+
+    try {
+      await this.adapter.events.create({
+        id: nanoid(),
+        provider: this.billingProvider,
+        providerEventId: eventId,
+        eventType,
+        payload: null,
+      });
+      return true;
+    } catch {
+      // Unique constraint violation — another request already claimed this event
+      this.logger.debug("Webhook event already processed (concurrent)", { eventId });
+      return false;
+    }
   }
 }

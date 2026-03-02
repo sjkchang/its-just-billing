@@ -390,13 +390,32 @@ export class BillingCheckoutService {
 
   /**
    * Get the lowest monthly-equivalent price from a product's price list.
+   * Normalizes day/week/year intervals to monthly for comparison.
+   * Skips one_time prices since they aren't comparable to recurring.
    */
   private getLowestMonthlyPrice(product: {
     prices: { amount: number; interval: string }[];
   }): number {
     let lowest = Infinity;
     for (const price of product.prices) {
-      const monthly = price.interval === "year" ? price.amount / 12 : price.amount;
+      let monthly: number;
+      switch (price.interval) {
+        case "day":
+          monthly = price.amount * 30;
+          break;
+        case "week":
+          monthly = price.amount * 4;
+          break;
+        case "year":
+          monthly = price.amount / 12;
+          break;
+        case "month":
+          monthly = price.amount;
+          break;
+        default:
+          // Skip one_time or unknown intervals
+          continue;
+      }
       if (monthly < lowest) lowest = monthly;
     }
     return lowest === Infinity ? 0 : lowest;

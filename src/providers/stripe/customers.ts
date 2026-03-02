@@ -93,13 +93,18 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
       const customer = await this.stripe.customers.retrieve(customerId);
       if (customer.deleted) return null;
 
-      const subscriptions = await this.stripe.subscriptions.list({
+      const relevantStatuses = new Set(["active", "trialing", "past_due", "incomplete", "unpaid", "canceled", "paused"]);
+      const relevantSubs: Stripe.Subscription[] = [];
+
+      // Use auto-pagination to fetch all subscriptions, not just the first page
+      for await (const sub of this.stripe.subscriptions.list({
         customer: customerId,
         status: "all",
-      });
-
-      const relevantStatuses = ["active", "trialing", "past_due", "incomplete", "unpaid", "canceled", "paused"];
-      const relevantSubs = subscriptions.data.filter((sub) => relevantStatuses.includes(sub.status));
+      })) {
+        if (relevantStatuses.has(sub.status)) {
+          relevantSubs.push(sub);
+        }
+      }
 
       return {
         customer: mapStripeCustomer(customer as Stripe.Customer),

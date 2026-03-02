@@ -35,11 +35,11 @@ export function mapSubscriptionStatus(status: Stripe.Subscription.Status): Subsc
 
 export function mapPriceInterval(
   interval: string | null | undefined
-): "month" | "year" | "one_time" {
+): "day" | "week" | "month" | "year" | "one_time" {
+  if (interval === "day") return "day";
+  if (interval === "week") return "week";
   if (interval === "month") return "month";
   if (interval === "year") return "year";
-  if (interval === "week") return "month";
-  if (interval === "day") return "month";
   return "one_time";
 }
 

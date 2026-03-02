@@ -26,17 +26,37 @@ export class BillingSyncService {
     private cache?: KeyValueCache
   ) {}
 
+  /** Per-user sync cooldown in seconds. */
+  private static readonly SYNC_COOLDOWN_SECONDS = 10;
+
   /**
    * Sync billing state for a user.
    * Resolves the provider customer ID from local DB or provider lookup,
    * then delegates to syncCustomerState.
+   *
+   * Enforces a per-user cooldown (when cache is available) to prevent
+   * abuse that could exhaust the provider's API rate limit.
    */
   async syncBillingState(user: BillingUser): Promise<void> {
+    if (this.cache) {
+      const cooldownKey = `billing:sync:cooldown:${user.id}`;
+      try {
+        const active = await this.cache.get(cooldownKey);
+        if (active) {
+          this.logger.debug("Skipping sync — cooldown active", { userId: user.id });
+          return;
+        }
+      } catch {
+        // Cache read failure — proceed with sync
+      }
+    }
+
     const provider = this.billingProvider;
     const customer = await this.adapter.customers.findByUserId(user.id, provider);
 
     if (customer) {
       await this.syncCustomerState(customer.providerCustomerId, provider);
+      await this.setSyncCooldown(user.id);
       return;
     }
 
@@ -45,10 +65,25 @@ export class BillingSyncService {
 
     if (!providerCustomer) {
       this.logger.debug("No billing customer found for user", { userId: user.id });
+      await this.setSyncCooldown(user.id);
       return;
     }
 
     await this.syncCustomerState(providerCustomer.id, provider);
+    await this.setSyncCooldown(user.id);
+  }
+
+  private async setSyncCooldown(userId: string): Promise<void> {
+    if (!this.cache) return;
+    try {
+      await this.cache.set(
+        `billing:sync:cooldown:${userId}`,
+        "1",
+        BillingSyncService.SYNC_COOLDOWN_SECONDS
+      );
+    } catch {
+      // Cooldown set failure — not critical
+    }
   }
 
   /**

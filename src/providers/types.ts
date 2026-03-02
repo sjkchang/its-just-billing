@@ -54,7 +54,7 @@ export interface BillingPrice {
   productId: string;
   amount: number;
   currency: string;
-  interval: "month" | "year" | "one_time";
+  interval: "day" | "week" | "month" | "year" | "one_time";
 }
 
 export interface CheckoutSession {

@@ -118,13 +118,33 @@ function matchRoute(
 }
 
 // ============================================================================
+// Redirect URL validation
+// ============================================================================
+
+function validateRedirectUrl(url: string, allowedOrigins?: string[]): void {
+  if (!allowedOrigins || allowedOrigins.length === 0) return;
+  try {
+    const parsed = new URL(url);
+    if (!allowedOrigins.includes(parsed.origin)) {
+      throw new BillingBadRequestError(
+        `Redirect URL origin is not allowed`
+      );
+    }
+  } catch (err) {
+    if (err instanceof BillingBadRequestError) throw err;
+    throw new BillingBadRequestError("Invalid redirect URL");
+  }
+}
+
+// ============================================================================
 // Handler factory
 // ============================================================================
 
 export function createBillingHandler(
   instance: BillingInstance,
   basePath: string,
-  webhookPath?: string
+  webhookPath?: string,
+  allowedRedirectOrigins?: string[]
 ): (request: Request) => Promise<Response> {
   // Normalize paths: remove trailing slashes
   const normalizedBase = basePath.replace(/\/$/, "");
@@ -159,6 +179,8 @@ export function createBillingHandler(
         const user = await resolveUserOrThrow(instance.resolveUser, request);
         const body = await request.json();
         const data = CheckoutRequest.parse(body);
+        validateRedirectUrl(data.successUrl, allowedRedirectOrigins);
+        if (data.cancelUrl) validateRedirectUrl(data.cancelUrl, allowedRedirectOrigins);
         const result = await instance.checkoutService.createCheckout(user, data);
         return jsonResponse(result);
       }
@@ -168,6 +190,7 @@ export function createBillingHandler(
         const user = await resolveUserOrThrow(instance.resolveUser, request);
         const body = await request.json();
         const data = PortalRequest.parse(body);
+        validateRedirectUrl(data.returnUrl, allowedRedirectOrigins);
         const result = await instance.checkoutService.createPortal(user, data.returnUrl);
         return jsonResponse(result);
       }

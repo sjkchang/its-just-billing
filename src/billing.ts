@@ -115,11 +115,12 @@ export class BillingInstance {
       this.syncService,
       billing,
       billingProvider,
-      logger
+      logger,
+      cache
     );
 
     // Create handler
-    this.handler = createBillingHandler(this, basePath, webhookPath);
+    this.handler = createBillingHandler(this, basePath, webhookPath, config.allowedRedirectOrigins);
 
     // Create server-side API
     this.api = {
