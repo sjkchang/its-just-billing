@@ -125,6 +125,9 @@ export class MockCustomerProvider implements BillingCustomerProvider {
     const updated: BillingSubscription = {
       ...subscription,
       productId: options.productId,
+      priceId: options.interval
+        ? `${options.productId}_price_${options.interval}`
+        : subscription.priceId,
       pendingCancellation: false,
       canceledAt: null,
     };
@@ -134,6 +137,7 @@ export class MockCustomerProvider implements BillingCustomerProvider {
       newProductId: options.productId,
       direction: options.direction,
       strategy: options.strategy,
+      interval: options.interval,
     });
     return updated;
   }

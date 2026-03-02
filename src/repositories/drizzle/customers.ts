@@ -27,12 +27,12 @@ export class DrizzleCustomerRepository implements CustomerRepository {
     return row ? Customer.parse(row) : null;
   }
 
-  async findByProviderCustomerId(providerCustomerId: string): Promise<Customer | null> {
+  async findByProviderCustomerId(providerCustomerId: string, provider: BillingProviderType): Promise<Customer | null> {
     const t = this.tables.billingCustomers;
     const [row] = await this.db
       .select()
       .from(t)
-      .where(eq(t.providerCustomerId, providerCustomerId))
+      .where(and(eq(t.providerCustomerId, providerCustomerId), eq(t.provider, provider)))
       .limit(1);
     return row ? Customer.parse(row) : null;
   }
@@ -93,7 +93,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
         name: data.name ?? null,
       })
       .onConflictDoUpdate({
-        target: t.providerCustomerId,
+        target: [t.provider, t.providerCustomerId],
         set: {
           email: data.email,
           name: data.name ?? null,

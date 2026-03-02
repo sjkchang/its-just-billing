@@ -16,7 +16,7 @@ import type { BillingEvent } from "../core/entities";
 export interface CustomerRepository {
   findById(id: string): Promise<Customer | null>;
   findByUserId(userId: string, provider: BillingProviderType): Promise<Customer | null>;
-  findByProviderCustomerId(providerCustomerId: string): Promise<Customer | null>;
+  findByProviderCustomerId(providerCustomerId: string, provider: BillingProviderType): Promise<Customer | null>;
   create(data: {
     id: string;
     userId: string;

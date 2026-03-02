@@ -59,7 +59,7 @@ export interface BillingAPI {
   resumeSubscription(user: BillingUser, subscriptionId: string): Promise<void>;
   changeSubscription(
     user: BillingUser,
-    input: { subscriptionId: string; productId: string }
+    input: { subscriptionId: string; productId: string; interval?: "day" | "week" | "month" | "year" }
   ): Promise<void>;
   syncBillingState(user: BillingUser): Promise<void>;
   handleWebhook(payload: string, headers: Record<string, string>): Promise<void>;

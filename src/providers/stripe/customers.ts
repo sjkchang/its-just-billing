@@ -5,7 +5,7 @@
 import type Stripe from "stripe";
 import type { BillingLogger } from "../../core/types";
 import { defaultLogger } from "../../core/types";
-import { mapStripeSubscription, resolveRecurringPriceId } from "./shared";
+import { mapStripeSubscription, resolveRecurringPriceId, resolveRecurringPriceByInterval } from "./shared";
 import type {
   BillingCustomerProvider,
   BillingCustomer,
@@ -188,7 +188,7 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
   ): Promise<BillingSubscription> {
     try {
       if (options.strategy === "at_period_end") {
-        return await this.scheduleChangeAtPeriodEnd(subscriptionId, options.productId);
+        return await this.scheduleChangeAtPeriodEnd(subscriptionId, options.productId, options.interval);
       }
 
       const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
@@ -208,7 +208,9 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
         });
       }
 
-      const priceId = await resolveRecurringPriceId(this.stripe, options.productId);
+      const priceId = options.interval
+        ? await resolveRecurringPriceByInterval(this.stripe, options.productId, options.interval)
+        : await resolveRecurringPriceId(this.stripe, options.productId);
 
       const sub = await this.stripe.subscriptions.update(subscriptionId, {
         items: [{ id: itemId, price: priceId }],
@@ -240,7 +242,8 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
    */
   private async scheduleChangeAtPeriodEnd(
     subscriptionId: string,
-    newProductId: string
+    newProductId: string,
+    interval?: "day" | "week" | "month" | "year"
   ): Promise<BillingSubscription> {
     const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
 
@@ -261,7 +264,9 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
     });
 
     // Resolve the new price
-    const newPriceId = await resolveRecurringPriceId(this.stripe, newProductId);
+    const newPriceId = interval
+      ? await resolveRecurringPriceByInterval(this.stripe, newProductId, interval)
+      : await resolveRecurringPriceId(this.stripe, newProductId);
 
     // Get current phase details
     const currentPhase = schedule.phases[0];

@@ -90,6 +90,7 @@ export interface ChangeSubscriptionOptions {
   productId: string;
   direction: "upgrade" | "downgrade" | "sidegrade";
   strategy: SubscriptionChangeStrategy;
+  interval?: "day" | "week" | "month" | "year";
 }
 
 // ============================================================================

@@ -38,13 +38,16 @@ export function createBillingSchema({ usersTable }: BillingSchemaOptions) {
         .notNull()
         .references(() => usersTable.id, { onDelete: "cascade" }),
       provider: billingProviderEnum("provider").notNull(),
-      providerCustomerId: text("provider_customer_id").notNull().unique(),
+      providerCustomerId: text("provider_customer_id").notNull(),
       email: text("email").notNull(),
       name: text("name"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    (t) => [unique("billing_customers_user_provider").on(t.userId, t.provider)]
+    (t) => [
+      unique("billing_customers_user_provider").on(t.userId, t.provider),
+      unique("billing_customers_provider_customer").on(t.provider, t.providerCustomerId),
+    ]
   );
 
   const billingSubscriptions = pgTable("billing_subscriptions", {

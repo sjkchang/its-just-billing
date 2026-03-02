@@ -10,6 +10,8 @@ describe("BillingConfigSchema", () => {
       expect(config.subscriptions.upgradeStrategy).toBe("immediate_prorate");
       expect(config.subscriptions.downgradeStrategy).toBe("at_period_end");
       expect(config.subscriptions.cancellation.timing).toBe("at_period_end");
+      expect(config.subscriptions.allowSidegrade).toBe(false);
+      expect(config.subscriptions.sidegradeStrategy).toBe("immediate_prorate");
       expect(config.subscriptions.cancellation.allowUncancel).toBe(true);
       expect(config.subscriptions.tierOrder).toBeUndefined();
       expect(config.entitlements).toBeUndefined();

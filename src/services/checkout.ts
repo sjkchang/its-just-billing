@@ -35,6 +35,7 @@ export interface PortalResult {
 export interface ChangeSubscriptionInput {
   subscriptionId: string;
   productId: string;
+  interval?: "day" | "week" | "month" | "year";
 }
 
 export class BillingCheckoutService {
@@ -315,32 +316,62 @@ export class BillingCheckoutService {
       throw new BillingBadRequestError("Subscription is not active");
     }
 
+    // 3. Determine direction
+    let direction: "upgrade" | "downgrade" | "sidegrade";
+
     if (subscription.providerProductId === input.productId) {
-      throw new BillingBadRequestError("Already subscribed to this product");
+      // Same product — only valid if changing interval
+      if (!input.interval) {
+        throw new BillingBadRequestError("Already subscribed to this product");
+      }
+
+      // Check if interval actually differs from current subscription's price
+      const currentProduct = await this.billing.products.getProduct(subscription.providerProductId);
+      if (currentProduct && subscription.providerPriceId) {
+        const currentPriceObj = currentProduct.prices.find(
+          (p) => p.id === subscription.providerPriceId
+        );
+        if (currentPriceObj && currentPriceObj.interval === input.interval) {
+          throw new BillingBadRequestError("Already subscribed at this interval");
+        }
+      }
+
+      direction = "sidegrade";
+    } else {
+      // Different product — use existing tier/price direction logic
+      const currentProduct = await this.billing.products.getProduct(
+        subscription.providerProductId
+      );
+      const currentPrice = currentProduct
+        ? this.getLowestMonthlyPrice(currentProduct)
+        : undefined;
+      const newPrice = this.getLowestMonthlyPrice(newProduct);
+
+      direction = getChangeDirection(subscription.providerProductId, input.productId, {
+        tierOrder: subsConfig.tierOrder,
+        currentPrice,
+        newPrice,
+      });
     }
 
-    // 3. Determine direction
-    const currentProduct = await this.billing.products.getProduct(subscription.providerProductId);
-    const currentPrice = currentProduct ? this.getLowestMonthlyPrice(currentProduct) : undefined;
-    const newPrice = this.getLowestMonthlyPrice(newProduct);
-
-    const direction = getChangeDirection(subscription.providerProductId, input.productId, {
-      tierOrder: subsConfig.tierOrder,
-      currentPrice,
-      newPrice,
-    });
-
-    // 4. Enforce allowUpgrade / allowDowngrade
+    // 4. Enforce allowUpgrade / allowDowngrade / allowSidegrade
     if (direction === "upgrade" && !subsConfig.allowUpgrade) {
       throw new BillingBadRequestError("Upgrades are not allowed");
     }
     if (direction === "downgrade" && !subsConfig.allowDowngrade) {
       throw new BillingBadRequestError("Downgrades are not allowed");
     }
+    if (direction === "sidegrade" && !subsConfig.allowSidegrade) {
+      throw new BillingBadRequestError("Sidegrades are not allowed");
+    }
 
-    // 5. Resolve strategy (sidegrades use upgrade strategy — immediate prorate by default)
+    // 5. Resolve strategy based on direction
     const strategy =
-      direction === "downgrade" ? subsConfig.downgradeStrategy : subsConfig.upgradeStrategy;
+      direction === "sidegrade"
+        ? subsConfig.sidegradeStrategy
+        : direction === "downgrade"
+          ? subsConfig.downgradeStrategy
+          : subsConfig.upgradeStrategy;
 
     // 6. Before hook
     const planChangeCtx = {
@@ -366,6 +397,7 @@ export class BillingCheckoutService {
         productId: input.productId,
         direction,
         strategy,
+        interval: input.interval,
       }
     );
 

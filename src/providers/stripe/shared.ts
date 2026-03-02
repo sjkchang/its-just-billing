@@ -97,3 +97,29 @@ export async function resolveRecurringPriceId(stripe: Stripe, productId: string)
 
   return prices.data[0].id;
 }
+
+/**
+ * Resolve a productId + interval to a recurring priceId.
+ * Fetches all active recurring prices for the product and matches by interval.
+ */
+export async function resolveRecurringPriceByInterval(
+  stripe: Stripe,
+  productId: string,
+  interval: "day" | "week" | "month" | "year"
+): Promise<string> {
+  const prices = await stripe.prices.list({
+    product: productId,
+    active: true,
+    type: "recurring",
+    limit: 100,
+  });
+
+  const match = prices.data.find((p) => p.recurring?.interval === interval);
+  if (!match) {
+    throw new Error(
+      `No active recurring price found for product ${productId} with interval "${interval}"`
+    );
+  }
+
+  return match.id;
+}

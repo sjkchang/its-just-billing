@@ -110,7 +110,7 @@ export class BillingSyncService {
     }
 
     if (!state.customer.externalId) {
-      const hasLocal = await this.adapter.customers.findByProviderCustomerId(providerCustomerId);
+      const hasLocal = await this.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
       if (!hasLocal) {
         this.logger.error("Cannot create customer without externalId", { providerCustomerId });
         return;
@@ -118,7 +118,7 @@ export class BillingSyncService {
     }
 
     // Snapshot local subscriptions before transaction (for transition detection)
-    const preCustomer = await this.adapter.customers.findByProviderCustomerId(providerCustomerId);
+    const preCustomer = await this.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
     const preSubs: Subscription[] = preCustomer
       ? await this.adapter.subscriptions.findByCustomerId(preCustomer.id)
       : [];
@@ -126,7 +126,7 @@ export class BillingSyncService {
     let syncedCustomer: Customer | null = null;
 
     await this.adapter.transaction(async (txAdapter) => {
-      let customer = await txAdapter.customers.findByProviderCustomerId(providerCustomerId);
+      let customer = await txAdapter.customers.findByProviderCustomerId(providerCustomerId, provider);
 
       if (!customer) {
         if (!state.customer.externalId) {

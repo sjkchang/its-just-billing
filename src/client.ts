@@ -88,7 +88,7 @@ export interface BillingClient {
   sync(): Promise<BillingStatusResponse>;
   cancelSubscription(id: string): Promise<BillingStatusResponse>;
   resumeSubscription(id: string): Promise<BillingStatusResponse>;
-  changeSubscription(id: string, productId: string): Promise<BillingStatusResponse>;
+  changeSubscription(id: string, productId: string, interval?: "day" | "week" | "month" | "year"): Promise<BillingStatusResponse>;
 }
 
 export function createBillingClient(options?: BillingClientOptions): BillingClient {
@@ -127,7 +127,7 @@ export function createBillingClient(options?: BillingClientOptions): BillingClie
     cancelSubscription: (id) => request<BillingStatusResponse>("DELETE", `/subscriptions/${encodeURIComponent(id)}`),
     resumeSubscription: (id) =>
       request<BillingStatusResponse>("POST", `/subscriptions/${encodeURIComponent(id)}/resume`),
-    changeSubscription: (id, productId) =>
-      request<BillingStatusResponse>("PUT", `/subscriptions/${encodeURIComponent(id)}`, { productId }),
+    changeSubscription: (id, productId, interval?) =>
+      request<BillingStatusResponse>("PUT", `/subscriptions/${encodeURIComponent(id)}`, { productId, ...(interval && { interval }) }),
   };
 }

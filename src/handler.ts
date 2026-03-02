@@ -27,6 +27,7 @@ const PortalRequest = z.object({
 
 const UpdateSubscriptionBody = z.object({
   productId: z.string().min(1, "Product ID is required"),
+  interval: z.enum(["day", "week", "month", "year"]).optional(),
 });
 
 // ============================================================================
@@ -236,6 +237,7 @@ export function createBillingHandler(
         await instance.checkoutService.changeSubscription(user, {
           subscriptionId: match.params.id,
           productId: data.productId,
+          interval: data.interval,
         });
         const status = await instance.statusService.getBillingStatus(user);
         return jsonResponse(toBillingStatusResponse(status));
