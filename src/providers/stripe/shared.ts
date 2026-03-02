@@ -38,6 +38,8 @@ export function mapPriceInterval(
 ): "month" | "year" | "one_time" {
   if (interval === "month") return "month";
   if (interval === "year") return "year";
+  if (interval === "week") return "month";
+  if (interval === "day") return "month";
   return "one_time";
 }
 
@@ -78,9 +80,18 @@ export async function resolveRecurringPriceId(stripe: Stripe, productId: string)
   const product = await stripe.products.retrieve(productId);
 
   if (product.default_price) {
-    const defaultPriceId =
-      typeof product.default_price === "string" ? product.default_price : product.default_price.id;
-    return defaultPriceId;
+    const defaultPrice = product.default_price;
+    if (typeof defaultPrice !== "string" && defaultPrice.recurring) {
+      return defaultPrice.id;
+    }
+    if (typeof defaultPrice === "string") {
+      // Need to fetch the price to verify it's recurring
+      const price = await stripe.prices.retrieve(defaultPrice);
+      if (price.recurring) {
+        return price.id;
+      }
+    }
+    // default_price is not recurring — fall through to search
   }
 
   const prices = await stripe.prices.list({

@@ -72,14 +72,13 @@ export class StripeWebhookProvider implements BillingWebhookProvider {
 
   extractResource(payload: string, headers: Record<string, string>): WebhookResource | null {
     try {
-      let event: Stripe.Event;
-
-      if (this.webhookSecret) {
-        const signature = headers["stripe-signature"] ?? "";
-        event = this.stripe.webhooks.constructEvent(payload, signature, this.webhookSecret);
-      } else {
-        event = JSON.parse(payload) as Stripe.Event;
+      if (!this.webhookSecret) {
+        this.logger.error("Webhook secret not configured, refusing to extract resource from unverified payload");
+        return null;
       }
+
+      const signature = headers["stripe-signature"] ?? "";
+      const event = this.stripe.webhooks.constructEvent(payload, signature, this.webhookSecret);
 
       const eventType = event.type;
       const eventId = event.id;

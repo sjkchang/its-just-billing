@@ -78,8 +78,8 @@ async function syncOneProduct(
     }
   }
 
-  // 5. Sync prices
-  const existingPrices = await stripe.prices.list({ product: product.id, active: true });
+  // 5. Sync prices (limit 100 covers all realistic cases)
+  const existingPrices = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
 
   const matchedStripePriceIds = new Set<string>();
   let firstPriceId: string | null = null;

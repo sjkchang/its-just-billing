@@ -24,14 +24,16 @@ export class MockCheckoutProvider implements BillingCheckoutProvider {
 
   async createCheckoutSession(options: CheckoutOptions): Promise<CheckoutSession> {
     const subscriptionId = `mock_sub_${++this.state.subscriptionIdCounter}`;
+    const isTrial = !!options.trialDays;
+    const periodDays = isTrial ? options.trialDays! : 30;
     this.state.subscriptions.set(subscriptionId, {
       id: subscriptionId,
       customerId: options.customerId,
       productId: options.productId,
       priceId: null,
-      status: "active",
+      status: isTrial ? "trialing" : "active",
       currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      currentPeriodEnd: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000),
       pendingCancellation: false,
       canceledAt: null,
       endedAt: null,

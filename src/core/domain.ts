@@ -181,7 +181,7 @@ export type Entitlement = string;
 export type EntitlementSet = ReadonlySet<Entitlement>;
 
 export interface EntitlementConfig {
-  /** Map Polar product ID → entitlements granted. */
+  /** Map product ID → entitlements granted. */
   products?: Record<string, Entitlement[]>;
   /** Fallback entitlements for unmapped paid products. */
   defaultPaid?: Entitlement[];

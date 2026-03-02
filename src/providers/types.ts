@@ -72,6 +72,7 @@ export interface CheckoutOptions {
   successUrl: string;
   cancelUrl?: string;
   metadata?: Record<string, string>;
+  trialDays?: number;
 }
 
 export interface WebhookResource {

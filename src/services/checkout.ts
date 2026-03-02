@@ -219,6 +219,10 @@ export class BillingCheckoutService {
       throw new BillingNotFoundError("Subscription not found");
     }
 
+    if (!isActive(subscription)) {
+      throw new BillingBadRequestError("Subscription is not active");
+    }
+
     const cancelHookCtx = { user, customer, subscription };
     await runBeforeHook(hooks?.api?.cancel?.before, cancelHookCtx, "cancel.before", this.logger);
 

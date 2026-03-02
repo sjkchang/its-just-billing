@@ -44,6 +44,7 @@ export class StripeProductProvider implements BillingProductProvider {
         const prices = await this.stripe.prices.list({
           product: product.id,
           active: true,
+          limit: 100,
         });
         products.push(mapStripeProduct(product, prices.data));
       }
@@ -63,6 +64,7 @@ export class StripeProductProvider implements BillingProductProvider {
       const prices = await this.stripe.prices.list({
         product: productId,
         active: true,
+        limit: 100,
       });
       return mapStripeProduct(product, prices.data);
     } catch (error) {

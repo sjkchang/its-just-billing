@@ -28,6 +28,8 @@ const SubscriptionStrategySchema = z
     downgradeStrategy: z.enum(["immediate_prorate", "at_period_end"]).default("at_period_end"),
     cancellation: CancellationConfigSchema,
     tierOrder: z.array(z.string()).optional(),
+    trialDays: z.number().int().positive().optional(),
+    singleSubscription: z.boolean().default(true),
   })
   .default({});
 

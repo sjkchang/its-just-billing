@@ -34,10 +34,19 @@ export class StripeCheckoutProvider implements BillingCheckoutProvider {
         success_url: options.successUrl,
         cancel_url: options.cancelUrl,
         metadata: options.metadata,
+        ...(options.trialDays && {
+          subscription_data: {
+            trial_period_days: options.trialDays,
+          },
+        }),
       });
 
+      if (!session.url) {
+        throw new Error("Stripe checkout session did not return a URL");
+      }
+
       return {
-        checkoutUrl: session.url!,
+        checkoutUrl: session.url,
         sessionId: session.id,
       };
     } catch (error) {

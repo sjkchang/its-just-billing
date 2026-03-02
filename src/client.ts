@@ -124,10 +124,10 @@ export function createBillingClient(options?: BillingClientOptions): BillingClie
     checkout: (input) => request<CheckoutResponse>("POST", "/checkout", input),
     createPortal: (returnUrl) => request<PortalResponse>("POST", "/portal", { returnUrl }),
     sync: () => request<BillingStatusResponse>("POST", "/sync"),
-    cancelSubscription: (id) => request<BillingStatusResponse>("DELETE", `/subscriptions/${id}`),
+    cancelSubscription: (id) => request<BillingStatusResponse>("DELETE", `/subscriptions/${encodeURIComponent(id)}`),
     resumeSubscription: (id) =>
-      request<BillingStatusResponse>("POST", `/subscriptions/${id}/resume`),
+      request<BillingStatusResponse>("POST", `/subscriptions/${encodeURIComponent(id)}/resume`),
     changeSubscription: (id, productId) =>
-      request<BillingStatusResponse>("PUT", `/subscriptions/${id}`, { productId }),
+      request<BillingStatusResponse>("PUT", `/subscriptions/${encodeURIComponent(id)}`, { productId }),
   };
 }

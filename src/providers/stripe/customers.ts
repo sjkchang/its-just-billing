@@ -74,8 +74,9 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
 
   async getCustomerByExternalId(externalId: string): Promise<BillingCustomer | null> {
     try {
+      const sanitized = externalId.replace(/[\\"]/g, "\\$&");
       const result = await this.stripe.customers.search({
-        query: `metadata["externalId"]:"${externalId}"`,
+        query: `metadata["externalId"]:"${sanitized}"`,
         limit: 1,
       });
 
@@ -97,12 +98,12 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
         status: "all",
       });
 
-      const activeStatuses = ["active", "trialing", "past_due", "incomplete"];
-      const activeSubs = subscriptions.data.filter((sub) => activeStatuses.includes(sub.status));
+      const relevantStatuses = ["active", "trialing", "past_due", "incomplete", "unpaid", "canceled", "paused"];
+      const relevantSubs = subscriptions.data.filter((sub) => relevantStatuses.includes(sub.status));
 
       return {
         customer: mapStripeCustomer(customer as Stripe.Customer),
-        subscriptions: activeSubs.map(mapStripeSubscription),
+        subscriptions: relevantSubs.map(mapStripeSubscription),
       };
     } catch (error) {
       this.logger.error("Failed to fetch customer state", {
