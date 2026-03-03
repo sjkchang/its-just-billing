@@ -73,6 +73,7 @@ export class BillingInstance {
   readonly handler: (request: Request) => Promise<Response>;
   readonly api: BillingAPI;
   readonly resolveUser: (req: Request) => Promise<BillingUser | null>;
+  readonly allowedRedirectOrigins?: string[];
 
   /** @internal — exposed for handler.ts */
   readonly syncService: BillingSyncService;
@@ -95,6 +96,7 @@ export class BillingInstance {
     cache?: KeyValueCache
   ) {
     this.resolveUser = resolveUser;
+    this.allowedRedirectOrigins = config.allowedRedirectOrigins;
 
     // Create services
     this.syncService = new BillingSyncService(adapter, billing, billingProvider, config, logger, cache);

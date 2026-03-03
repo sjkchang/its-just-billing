@@ -24,6 +24,10 @@
 		"./providers/stripe": {
 			"import": "./dist/providers/stripe/index.js",
 			"types": "./dist/providers/stripe/index.d.ts"
+		},
+		"./hono": {
+			"import": "./dist/handler/hono.js",
+			"types": "./dist/handler/hono.d.ts"
 		}
 	},
 	"scripts": {
@@ -38,10 +42,14 @@
 	},
 	"peerDependencies": {
 		"drizzle-orm": "^0.41.0",
+		"hono": "^4.0.0",
 		"stripe": "^20.0.0"
 	},
 	"peerDependenciesMeta": {
 		"drizzle-orm": {
+			"optional": true
+		},
+		"hono": {
 			"optional": true
 		},
 		"stripe": {

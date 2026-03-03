@@ -6,6 +6,7 @@ export default defineConfig({
 		"src/client.ts",
 		"src/repositories/drizzle/index.ts",
 		"src/providers/stripe/index.ts",
+		"src/handler/hono.ts",
 	],
 	format: "esm",
 	dts: true,
