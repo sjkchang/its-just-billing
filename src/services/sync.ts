@@ -159,6 +159,7 @@ export class BillingSyncService {
           currentPeriodStart: sub.currentPeriodStart,
           currentPeriodEnd: sub.currentPeriodEnd,
           pendingCancellation: sub.pendingCancellation,
+          pendingProductId: sub.pendingProductId ?? null,
           canceledAt: sub.canceledAt,
           endedAt: sub.endedAt,
         });

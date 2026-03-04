@@ -53,7 +53,7 @@ export class StripeSubscriptionProvider implements BillingSubscriptionProvider {
 
       this.logger.info("Uncanceled subscription", { subscriptionId });
 
-      return mapStripeSubscription(sub);
+      return mapStripeSubscription(sub, null);
     } catch (error) {
       this.logger.error("Failed to uncancel subscription", {
         subscriptionId,
@@ -182,16 +182,30 @@ export class StripeSubscriptionProvider implements BillingSubscriptionProvider {
       transitionDate: new Date((currentPhase.end_date ?? 0) * 1000).toISOString(),
     });
 
-    // Return current subscription state (still on old product)
-    return mapStripeSubscription(existing);
+    // Return current subscription state with pending product info
+    return mapStripeSubscription(existing, newProductId);
   }
 
   // ---------------------------------------------------------------------------
   // Cancel strategies
   // ---------------------------------------------------------------------------
 
+  private async releaseScheduleIfExists(subscriptionId: string): Promise<void> {
+    const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
+    if (existing.schedule) {
+      const scheduleId =
+        typeof existing.schedule === "string" ? existing.schedule : existing.schedule.id;
+      await this.stripe.subscriptionSchedules.release(scheduleId);
+      this.logger.info("Released existing schedule before cancellation", {
+        subscriptionId,
+        scheduleId,
+      });
+    }
+  }
+
   private async cancelImmediate(subscriptionId: string): Promise<BillingSubscription> {
     try {
+      await this.releaseScheduleIfExists(subscriptionId);
       const sub = await this.stripe.subscriptions.cancel(subscriptionId);
       return mapStripeSubscription(sub);
     } catch (error) {
@@ -205,12 +219,43 @@ export class StripeSubscriptionProvider implements BillingSubscriptionProvider {
 
   private async cancelAtPeriodEnd(subscriptionId: string): Promise<BillingSubscription> {
     try {
+      await this.releaseScheduleIfExists(subscriptionId);
       const sub = await this.stripe.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
       });
       return mapStripeSubscription(sub);
     } catch (error) {
       this.logger.error("Failed to cancel subscription at period end", {
+        subscriptionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  async cancelScheduledChange(subscriptionId: string): Promise<BillingSubscription> {
+    try {
+      const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
+
+      if (!existing.schedule) {
+        // No schedule to cancel — return current state
+        return mapStripeSubscription(existing, null);
+      }
+
+      const scheduleId =
+        typeof existing.schedule === "string" ? existing.schedule : existing.schedule.id;
+      await this.stripe.subscriptionSchedules.release(scheduleId);
+
+      this.logger.info("Released subscription schedule (canceled pending plan change)", {
+        subscriptionId,
+        scheduleId,
+      });
+
+      // Re-fetch to get clean state after schedule release
+      const updated = await this.stripe.subscriptions.retrieve(subscriptionId);
+      return mapStripeSubscription(updated, null);
+    } catch (error) {
+      this.logger.error("Failed to cancel scheduled plan change", {
         subscriptionId,
         error: error instanceof Error ? error.message : String(error),
       });

@@ -4,6 +4,28 @@
 
 import Stripe from "stripe";
 
+/**
+ * Archive any stale e2e products left behind by crashed/interrupted test runs.
+ * Products created by e2e tests use IDs starting with "e2e_".
+ */
+export async function cleanStaleE2EProducts(secretKey: string): Promise<void> {
+  const stripe = new Stripe(secretKey);
+
+  for await (const product of stripe.products.list({ active: true })) {
+    if (!product.id.startsWith("e2e_")) continue;
+
+    try {
+      const prices = await stripe.prices.list({ product: product.id, active: true });
+      for (const price of prices.data) {
+        await stripe.prices.update(price.id, { active: false });
+      }
+      await stripe.products.update(product.id, { active: false });
+    } catch {
+      // Best-effort
+    }
+  }
+}
+
 export class StripeCleanup {
   private stripe: Stripe;
   private customerIds: Set<string> = new Set();

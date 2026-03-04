@@ -185,6 +185,7 @@ export class BillingCheckoutService {
       currentPeriodStart: result.currentPeriodStart,
       currentPeriodEnd: result.currentPeriodEnd,
       pendingCancellation: result.pendingCancellation,
+      pendingProductId: result.pendingProductId ?? null,
       canceledAt: result.canceledAt,
       endedAt: result.endedAt,
     });
@@ -270,6 +271,38 @@ export class BillingCheckoutService {
     await this.applyMutationResult(subscriptionId, result);
 
     this.ctx.logger.info("Uncanceled subscription", {
+      userId: user.id,
+      subscriptionId,
+    });
+
+    await this.invalidateStatusCache(user.id);
+  }
+
+  /**
+   * Cancel a scheduled plan change (release the subscription schedule).
+   */
+  async cancelScheduledChange(user: BillingUser, subscriptionId: string): Promise<void> {
+    const customer = await this.ctx.adapter.customers.findByUserId(user.id, this.ctx.providerType);
+    if (!customer) {
+      throw new BillingNotFoundError("No billing account found");
+    }
+
+    const subscription = await this.ctx.adapter.subscriptions.findById(subscriptionId);
+    if (!subscription || subscription.customerId !== customer.id) {
+      throw new BillingNotFoundError("Subscription not found");
+    }
+
+    if (!subscription.pendingProductId) {
+      throw new BillingBadRequestError("No scheduled plan change to cancel");
+    }
+
+    const result = await this.ctx.providers.subscriptions.cancelScheduledChange(
+      subscription.providerSubscriptionId
+    );
+
+    await this.applyMutationResult(subscriptionId, result);
+
+    this.ctx.logger.info("Canceled scheduled plan change", {
       userId: user.id,
       subscriptionId,
     });

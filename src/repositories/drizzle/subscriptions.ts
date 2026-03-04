@@ -43,6 +43,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
     currentPeriodStart?: Date | null;
     currentPeriodEnd?: Date | null;
     pendingCancellation?: boolean;
+    pendingProductId?: string | null;
     canceledAt?: Date | null;
     endedAt?: Date | null;
   }): Promise<Subscription> {
@@ -59,6 +60,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
         currentPeriodStart: data.currentPeriodStart ?? null,
         currentPeriodEnd: data.currentPeriodEnd ?? null,
         pendingCancellation: data.pendingCancellation ?? false,
+        pendingProductId: data.pendingProductId ?? null,
         canceledAt: data.canceledAt ?? null,
         endedAt: data.endedAt ?? null,
       })
@@ -77,6 +79,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
         | "currentPeriodStart"
         | "currentPeriodEnd"
         | "pendingCancellation"
+        | "pendingProductId"
         | "canceledAt"
         | "endedAt"
       >
@@ -101,6 +104,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
     currentPeriodStart?: Date | null;
     currentPeriodEnd?: Date | null;
     pendingCancellation?: boolean;
+    pendingProductId?: string | null;
     canceledAt?: Date | null;
     endedAt?: Date | null;
   }): Promise<Subscription> {
@@ -117,6 +121,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
         currentPeriodStart: data.currentPeriodStart ?? null,
         currentPeriodEnd: data.currentPeriodEnd ?? null,
         pendingCancellation: data.pendingCancellation ?? false,
+        pendingProductId: data.pendingProductId ?? null,
         canceledAt: data.canceledAt ?? null,
         endedAt: data.endedAt ?? null,
       })
@@ -129,6 +134,7 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
           currentPeriodStart: data.currentPeriodStart ?? null,
           currentPeriodEnd: data.currentPeriodEnd ?? null,
           pendingCancellation: data.pendingCancellation ?? false,
+          pendingProductId: data.pendingProductId ?? null,
           canceledAt: data.canceledAt ?? null,
           endedAt: data.endedAt ?? null,
           updatedAt: new Date(),

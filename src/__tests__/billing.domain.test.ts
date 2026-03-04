@@ -23,6 +23,7 @@ function createTestSubscription(overrides: Partial<Subscription> = {}): Subscrip
     currentPeriodStart: now,
     currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
     pendingCancellation: false,
+    pendingProductId: null,
     canceledAt: null,
     endedAt: null,
     createdAt: now,

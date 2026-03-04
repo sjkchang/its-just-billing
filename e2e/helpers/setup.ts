@@ -71,6 +71,7 @@ const DDL = `
     current_period_start TIMESTAMPTZ,
     current_period_end TIMESTAMPTZ,
     pending_cancellation BOOLEAN NOT NULL DEFAULT FALSE,
+    pending_product_id TEXT,
     canceled_at TIMESTAMPTZ,
     ended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

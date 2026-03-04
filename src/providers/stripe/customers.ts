@@ -104,9 +104,37 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
         }
       }
 
+      // For each subscription with a schedule, fetch the pending product ID
+      const subscriptions: import("../types").BillingSubscription[] = [];
+      for (const sub of relevantSubs) {
+        let pendingProductId: string | null = null;
+        if (sub.schedule) {
+          try {
+            const scheduleId = typeof sub.schedule === "string" ? sub.schedule : sub.schedule.id;
+            const schedule = await this.stripe.subscriptionSchedules.retrieve(scheduleId);
+            // The next phase (after current) contains the pending product
+            if (schedule.phases.length > 1) {
+              const nextPhase = schedule.phases[schedule.phases.length - 1];
+              const nextItem = nextPhase.items[0];
+              if (nextItem) {
+                const priceId = typeof nextItem.price === "string" ? nextItem.price : nextItem.price;
+                const price = await this.stripe.prices.retrieve(priceId as string);
+                pendingProductId = typeof price.product === "string" ? price.product : price.product.id;
+              }
+            }
+          } catch (err) {
+            this.logger.warn("Failed to fetch subscription schedule", {
+              subscriptionId: sub.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        subscriptions.push(mapStripeSubscription(sub, pendingProductId));
+      }
+
       return {
         customer: mapStripeCustomer(customer as Stripe.Customer),
-        subscriptions: relevantSubs.map(mapStripeSubscription),
+        subscriptions,
       };
     } catch (error) {
       this.logger.error("Failed to fetch customer state", {

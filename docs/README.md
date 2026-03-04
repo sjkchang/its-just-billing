@@ -28,10 +28,6 @@ app.all("/api/v1/billing/*", (req) => billing.handler(req));
 - **[HTTP API](./http-api.md)** — endpoints exposed by the handler, request/response shapes
 - **[Client SDK](./client.md)** — typed frontend client for calling the billing API
 
-### Framework guides
-
-- **[Hono](./frameworks/hono.md)**
-
 ### Database guides
 
 - **[Drizzle](./databases/drizzle.md)**

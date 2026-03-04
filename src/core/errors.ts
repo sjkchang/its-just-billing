@@ -1,8 +1,8 @@
 /**
  * Billing error classes.
  *
- * Used by services and routes within the billing package.
- * The Hono error handler in routes.ts maps these to HTTP status codes.
+ * Used by services and the web handler within the billing package.
+ * The handler maps these to HTTP status codes.
  */
 
 export class BillingError extends Error {

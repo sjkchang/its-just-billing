@@ -30,6 +30,7 @@ export interface BillingStatusResult {
     status: SubscriptionStatus;
     currentPeriodEnd: Date | null;
     pendingCancellation: boolean;
+    pendingProductId: string | null;
   } | null;
   statusMessage: string;
   metadata: Record<string, string> | null;
@@ -119,6 +120,7 @@ export class BillingStatusService {
           status: providerMissingSub.status,
           currentPeriodEnd: providerMissingSub.currentPeriodEnd,
           pendingCancellation: false,
+          pendingProductId: null,
         },
         statusMessage: "Subscription not found in billing provider",
         metadata: null,
@@ -148,6 +150,7 @@ export class BillingStatusService {
         status: sub.status,
         currentPeriodEnd: sub.currentPeriodEnd,
         pendingCancellation: sub.pendingCancellation,
+        pendingProductId: sub.pendingProductId ?? null,
       },
       statusMessage: getStatusMessage(activeSubscription),
       metadata: product?.metadata ?? null,

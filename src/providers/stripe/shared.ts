@@ -43,7 +43,10 @@ export function mapPriceInterval(
   return "one_time";
 }
 
-export function mapStripeSubscription(sub: Stripe.Subscription): BillingSubscription {
+export function mapStripeSubscription(
+  sub: Stripe.Subscription,
+  pendingProductId?: string | null,
+): BillingSubscription {
   const item = sub.items.data[0];
   return {
     id: sub.id,
@@ -57,6 +60,7 @@ export function mapStripeSubscription(sub: Stripe.Subscription): BillingSubscrip
     currentPeriodStart: item ? new Date(item.current_period_start * 1000) : null,
     currentPeriodEnd: item ? new Date(item.current_period_end * 1000) : null,
     pendingCancellation: sub.cancel_at !== null,
+    pendingProductId: pendingProductId ?? null,
     canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
     endedAt: sub.ended_at ? new Date(sub.ended_at * 1000) : null,
   };

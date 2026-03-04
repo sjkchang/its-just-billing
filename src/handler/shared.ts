@@ -45,6 +45,7 @@ export function toBillingStatusResponse(result: BillingStatusResult) {
           status: result.subscription.status,
           currentPeriodEnd: result.subscription.currentPeriodEnd?.toISOString() ?? null,
           pendingCancellation: result.subscription.pendingCancellation,
+          pendingProductId: result.subscription.pendingProductId,
         }
       : null,
     statusMessage: result.statusMessage,

@@ -99,6 +99,12 @@ export function createBillingHandler(
       const status = await instance.statusService.getBillingStatus(user);
       return jsonResponse(toBillingStatusResponse(status));
     })
+    .delete("/subscriptions/:id/scheduled-change", async (request, params) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      await instance.checkoutService.cancelScheduledChange(user, params.id);
+      const status = await instance.statusService.getBillingStatus(user);
+      return jsonResponse(toBillingStatusResponse(status));
+    })
     .put("/subscriptions/:id", async (request, params) => {
       const user = await resolveUserOrThrow(instance.resolveUser, request);
       const body = await request.json();
@@ -135,7 +141,7 @@ export function createBillingHandler(
       }
 
       const method = request.method.toUpperCase();
-      const { handlers, params } = router.find(method as Trouter.HTTPMethod, path);
+      const { handlers, params } = router.find(method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH", path);
 
       if (handlers.length === 0) {
         return errorResponse("Not found", 404);

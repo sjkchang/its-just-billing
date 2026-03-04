@@ -30,6 +30,8 @@ export interface BillingSubscription {
   currentPeriodStart?: Date | null;
   currentPeriodEnd?: Date | null;
   pendingCancellation: boolean;
+  /** Product ID the subscription is scheduled to change to (e.g. at_period_end downgrade). */
+  pendingProductId?: string | null;
   canceledAt?: Date | null;
   endedAt?: Date | null;
 }
@@ -140,6 +142,7 @@ export interface BillingSubscriptionProvider {
   changeHandlers: Partial<Record<SubscriptionChangeStrategy, ChangeStrategyHandler>>;
   cancelHandlers: Partial<Record<CancellationTiming, CancelStrategyHandler>>;
   uncancel(subscriptionId: string): Promise<BillingSubscription>;
+  cancelScheduledChange(subscriptionId: string): Promise<BillingSubscription>;
 }
 
 export interface BillingWebhookProvider {

@@ -56,6 +56,7 @@ export const Subscription = z.object({
   currentPeriodStart: z.date().nullable(),
   currentPeriodEnd: z.date().nullable(),
   pendingCancellation: z.boolean(),
+  pendingProductId: z.string().nullable(),
   canceledAt: z.date().nullable(),
   endedAt: z.date().nullable(),
   createdAt: z.date(),

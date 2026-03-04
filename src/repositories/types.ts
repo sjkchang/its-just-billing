@@ -50,6 +50,7 @@ export interface SubscriptionRepository {
     currentPeriodStart?: Date | null;
     currentPeriodEnd?: Date | null;
     pendingCancellation?: boolean;
+    pendingProductId?: string | null;
     canceledAt?: Date | null;
     endedAt?: Date | null;
   }): Promise<Subscription>;
@@ -64,6 +65,7 @@ export interface SubscriptionRepository {
         | "currentPeriodStart"
         | "currentPeriodEnd"
         | "pendingCancellation"
+        | "pendingProductId"
         | "canceledAt"
         | "endedAt"
       >
@@ -79,6 +81,7 @@ export interface SubscriptionRepository {
     currentPeriodStart?: Date | null;
     currentPeriodEnd?: Date | null;
     pendingCancellation?: boolean;
+    pendingProductId?: string | null;
     canceledAt?: Date | null;
     endedAt?: Date | null;
   }): Promise<Subscription>;

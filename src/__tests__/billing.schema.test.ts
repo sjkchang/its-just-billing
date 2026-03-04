@@ -7,7 +7,7 @@ describe("BillingConfigSchema", () => {
       const config = BillingConfigSchema.parse(undefined);
       expect(config.subscriptions.allowUpgrade).toBe(true);
       expect(config.subscriptions.allowDowngrade).toBe(false);
-      expect(config.subscriptions.upgradeStrategy).toBe("immediate_prorate");
+      expect(config.subscriptions.upgradeStrategy).toBe("immediate_full");
       expect(config.subscriptions.downgradeStrategy).toBe("at_period_end");
       expect(config.subscriptions.cancellation.timing).toBe("at_period_end");
       expect(config.subscriptions.allowSidegrade).toBe(false);
@@ -32,7 +32,7 @@ describe("BillingConfigSchema", () => {
       });
       expect(config.subscriptions.allowDowngrade).toBe(true);
       expect(config.subscriptions.allowUpgrade).toBe(true); // default preserved
-      expect(config.subscriptions.upgradeStrategy).toBe("immediate_prorate");
+      expect(config.subscriptions.upgradeStrategy).toBe("immediate_full");
     });
 
     it("merges partial cancellation with defaults", () => {

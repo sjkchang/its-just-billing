@@ -80,6 +80,20 @@ export class MockSubscriptionProvider implements BillingSubscriptionProvider {
     return updated;
   }
 
+  async cancelScheduledChange(subscriptionId: string): Promise<BillingSubscription> {
+    const subscription = this.state.subscriptions.get(subscriptionId);
+    if (!subscription) {
+      throw new Error(`Subscription not found: ${subscriptionId}`);
+    }
+    const updated: BillingSubscription = {
+      ...subscription,
+      pendingProductId: null,
+    };
+    this.state.subscriptions.set(subscriptionId, updated);
+    this.logger.debug("[Mock Billing] Canceled scheduled plan change", { subscriptionId });
+    return updated;
+  }
+
   private async cancel(
     subscriptionId: string,
     atPeriodEnd: boolean

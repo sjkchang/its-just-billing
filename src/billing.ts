@@ -55,6 +55,7 @@ export interface BillingAPI {
     returnUrl: string
   ): ReturnType<BillingCheckoutService["createPortal"]>;
   cancelSubscription(user: BillingUser, subscriptionId: string): Promise<void>;
+  cancelScheduledChange(user: BillingUser, subscriptionId: string): Promise<void>;
   resumeSubscription(user: BillingUser, subscriptionId: string): Promise<void>;
   changeSubscription(
     user: BillingUser,
@@ -113,6 +114,8 @@ export class BillingInstance {
       createPortal: (user, returnUrl) => this.checkoutService.createPortal(user, returnUrl),
       cancelSubscription: (user, subscriptionId) =>
         this.checkoutService.cancelSubscription(user, subscriptionId),
+      cancelScheduledChange: (user, subscriptionId) =>
+        this.checkoutService.cancelScheduledChange(user, subscriptionId),
       resumeSubscription: (user, subscriptionId) =>
         this.checkoutService.uncancelSubscription(user, subscriptionId),
       changeSubscription: (user, input) => this.checkoutService.changeSubscription(user, input),

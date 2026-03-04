@@ -24,6 +24,7 @@ export interface BillingStatusResponse {
     status: string;
     currentPeriodEnd: string | null;
     pendingCancellation: boolean;
+    pendingProductId: string | null;
   } | null;
   statusMessage: string;
   metadata: Record<string, string> | null;
@@ -90,6 +91,7 @@ export interface BillingClient {
   cancelSubscription(id: string): Promise<BillingStatusResponse>;
   resumeSubscription(id: string): Promise<BillingStatusResponse>;
   changeSubscription(id: string, productId: string, interval?: "day" | "week" | "month" | "year"): Promise<BillingStatusResponse>;
+  cancelScheduledChange(id: string): Promise<BillingStatusResponse>;
 }
 
 export function createBillingClient(options?: BillingClientOptions): BillingClient {
@@ -134,5 +136,7 @@ export function createBillingClient(options?: BillingClientOptions): BillingClie
       request<BillingStatusResponse>("POST", `/subscriptions/${encodeURIComponent(id)}/resume`),
     changeSubscription: (id, productId, interval?) =>
       request<BillingStatusResponse>("PUT", `/subscriptions/${encodeURIComponent(id)}`, { productId, ...(interval && { interval }) }),
+    cancelScheduledChange: (id) =>
+      request<BillingStatusResponse>("DELETE", `/subscriptions/${encodeURIComponent(id)}/scheduled-change`),
   };
 }

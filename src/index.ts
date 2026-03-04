@@ -15,8 +15,8 @@
  *   resolveUser: async (req) => { ... },
  * });
  *
- * // Hono
- * app.all("/api/v1/billing/*", (c) => billing.handler(c.req.raw));
+ * // Any framework that gives you a Request
+ * app.all("/api/v1/billing/*", (req) => billing.handler(req));
  * ```
  */
 

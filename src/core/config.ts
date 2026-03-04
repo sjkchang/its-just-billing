@@ -25,7 +25,7 @@ const SubscriptionStrategySchema = z
     allowUpgrade: z.boolean().default(true),
     allowDowngrade: z.boolean().default(false),
     allowSidegrade: z.boolean().default(false),
-    upgradeStrategy: z.enum(["immediate_prorate", "immediate_full"]).default("immediate_prorate"),
+    upgradeStrategy: z.enum(["immediate_prorate", "immediate_full"]).default("immediate_full"),
     downgradeStrategy: z.enum(["immediate_prorate", "at_period_end"]).default("at_period_end"),
     sidegradeStrategy: z
       .enum(["immediate_prorate", "immediate_full", "at_period_end"])

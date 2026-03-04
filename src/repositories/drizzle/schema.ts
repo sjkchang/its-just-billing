@@ -62,6 +62,7 @@ export function createBillingSchema({ usersTable }: BillingSchemaOptions) {
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     pendingCancellation: boolean("pending_cancellation").notNull().default(false),
+    pendingProductId: text("pending_product_id"),
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
