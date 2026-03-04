@@ -41,6 +41,7 @@ export const SubscriptionStatus = z.enum([
   "unpaid",
   "canceled",
   "paused",
+  "provider_missing",
 ]);
 
 export type SubscriptionStatus = z.infer<typeof SubscriptionStatus>;

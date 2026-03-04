@@ -5,6 +5,7 @@
 export { StripeProductProvider } from "./products";
 export { StripeCheckoutProvider } from "./checkout";
 export { StripeCustomerProvider } from "./customers";
+export { StripeSubscriptionProvider } from "./subscriptions";
 export { StripeWebhookProvider } from "./webhooks";
 export {
   createStripeClient,
@@ -18,6 +19,7 @@ import { createStripeClient } from "./shared";
 import { StripeProductProvider } from "./products";
 import { StripeCheckoutProvider } from "./checkout";
 import { StripeCustomerProvider } from "./customers";
+import { StripeSubscriptionProvider } from "./subscriptions";
 import { StripeWebhookProvider } from "./webhooks";
 import type { BillingProviders } from "../types";
 import type { BillingLogger } from "../../core/types";
@@ -31,12 +33,15 @@ export function createStripeProviders(config: {
   const logger = config.logger ?? defaultLogger;
   const stripe = createStripeClient(config.secretKey, logger);
 
+  if (!config.webhookSecret) logger.warn("Stripe webhookSecret not configured — all webhooks will be rejected");
+
   logger.info("Stripe billing providers initialized");
 
   return {
     products: new StripeProductProvider(stripe, logger),
     checkout: new StripeCheckoutProvider(stripe, logger),
     customers: new StripeCustomerProvider(stripe, logger),
+    subscriptions: new StripeSubscriptionProvider(stripe, logger),
     webhooks: new StripeWebhookProvider(stripe, config.webhookSecret, logger),
   };
 }

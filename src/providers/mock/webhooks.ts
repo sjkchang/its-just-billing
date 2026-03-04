@@ -20,20 +20,25 @@ export class MockWebhookProvider implements BillingWebhookProvider {
     this.logger = logger ?? defaultLogger;
   }
 
-  verifySignature(_payload: string, _headers: Record<string, string>): boolean {
+  verifySignature(payload: string, _headers: Record<string, string>): unknown | null {
     this.logger.debug("[Mock Billing] Verify webhook signature (always true in mock mode)");
-    return true;
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return null;
+    }
   }
 
-  extractResource(payload: string, _headers: Record<string, string>): WebhookResource | null {
+  extractResource(verifiedPayload: unknown): WebhookResource | null {
     try {
-      const event = JSON.parse(payload);
+      const event = verifiedPayload as Record<string, Record<string, string>>;
       this.logger.debug("[Mock Billing] Extract webhook resource", { eventType: event.type });
+      const data = event.data ?? {};
       return {
-        eventId: event.id || `mock_evt_${Date.now()}`,
-        eventType: event.type || "unknown",
+        eventId: (event.id as unknown as string) || `mock_evt_${Date.now()}`,
+        eventType: (event.type as unknown as string) || "unknown",
         resourceType: "subscription",
-        customerId: event.data?.customer_id || event.data?.customerId || "",
+        customerId: data.customer_id || data.customerId || "",
       };
     } catch {
       this.logger.debug("[Mock Billing] Failed to parse webhook payload");

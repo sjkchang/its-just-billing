@@ -12,5 +12,5 @@ export default defineConfig({
 	dts: true,
 	splitting: true,
 	clean: true,
-	external: ["stripe", "drizzle-orm", "nanoid", "zod"],
+	external: ["stripe", "drizzle-orm", "nanoid", "trouter", "zod"],
 });

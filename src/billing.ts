@@ -5,13 +5,12 @@
  * Created by the createBilling() factory.
  */
 
-import type { BillingProviders, BillingProviderConfig } from "./providers";
-import type { BillingProviderType } from "./core/entities";
+import type { BillingProviderConfig } from "./providers";
 import type { BillingAppConfig } from "./core/config";
 import { BillingConfigSchema, getManagedProducts } from "./core/config";
 import type { BillingRepositories } from "./repositories/types";
 import type { BillingUser } from "./core/hooks";
-import type { BillingLogger, KeyValueCache } from "./core/types";
+import type { BillingLogger, BillingContext, KeyValueCache } from "./core/types";
 import { defaultLogger } from "./core/types";
 import { createBillingProviders } from "./providers";
 
@@ -85,44 +84,22 @@ export class BillingInstance {
   readonly webhookService: BillingWebhookService;
 
   private constructor(
-    billing: BillingProviders,
-    billingProvider: BillingProviderType,
-    adapter: BillingRepositories,
-    config: BillingAppConfig,
+    ctx: BillingContext,
     resolveUser: (req: Request) => Promise<BillingUser | null>,
     basePath: string,
     webhookPath: string | undefined,
-    logger: BillingLogger,
-    cache?: KeyValueCache
   ) {
     this.resolveUser = resolveUser;
-    this.allowedRedirectOrigins = config.allowedRedirectOrigins;
+    this.allowedRedirectOrigins = ctx.config.allowedRedirectOrigins;
 
     // Create services
-    this.syncService = new BillingSyncService(adapter, billing, billingProvider, config, logger, cache);
-
-    this.statusService = new BillingStatusService(adapter, billing, billingProvider, config, cache, logger);
-
-    this.checkoutService = new BillingCheckoutService(
-      adapter,
-      billing,
-      billingProvider,
-      config,
-      logger,
-      cache
-    );
-
-    this.webhookService = new BillingWebhookService(
-      adapter,
-      this.syncService,
-      billing,
-      billingProvider,
-      logger,
-      cache
-    );
+    this.syncService = new BillingSyncService(ctx);
+    this.statusService = new BillingStatusService(ctx);
+    this.checkoutService = new BillingCheckoutService(ctx);
+    this.webhookService = new BillingWebhookService(ctx, this.syncService);
 
     // Create handler
-    this.handler = createBillingHandler(this, basePath, webhookPath, config.allowedRedirectOrigins);
+    this.handler = createBillingHandler(this, basePath, webhookPath, ctx.config.allowedRedirectOrigins);
 
     // Create server-side API
     this.api = {
@@ -162,16 +139,15 @@ export class BillingInstance {
         });
     }
 
-    return new BillingInstance(
-      billing,
-      createConfig.provider.provider,
-      createConfig.adapter,
+    const ctx: BillingContext = {
+      adapter: createConfig.adapter,
+      providers: billing,
+      providerType: createConfig.provider.provider,
       config,
-      createConfig.resolveUser,
-      basePath,
-      createConfig.webhookPath,
       logger,
-      createConfig.cache
-    );
+      cache: createConfig.cache,
+    };
+
+    return new BillingInstance(ctx, createConfig.resolveUser, basePath, createConfig.webhookPath);
   }
 }

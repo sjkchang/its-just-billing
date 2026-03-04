@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { BillingBadRequestError, BillingNotFoundError } from "../core/errors";
+import { BillingBadRequestError, BillingUnauthorizedError, BillingNotFoundError } from "../core/errors";
 import type { BillingUser } from "../core/hooks";
 import type { BillingStatusResult } from "../services/status";
 
@@ -35,6 +35,7 @@ export const UpdateSubscriptionBodySchema = z.object({
 export function toBillingStatusResponse(result: BillingStatusResult) {
   return {
     entitlements: result.entitlements,
+    accessState: result.accessState,
     productId: result.productId,
     productName: result.productName,
     productDescription: result.productDescription,
@@ -61,7 +62,7 @@ export async function resolveUserOrThrow(
 ): Promise<BillingUser> {
   const user = await resolveUser(req);
   if (!user) {
-    throw new BillingNotFoundError("Unauthorized");
+    throw new BillingUnauthorizedError();
   }
   return user;
 }
@@ -97,10 +98,10 @@ export function mapBillingError(err: unknown): { status: number; body: { error: 
   if (err instanceof BillingBadRequestError) {
     return { status: 400, body: { error: err.message } };
   }
+  if (err instanceof BillingUnauthorizedError) {
+    return { status: 401, body: { error: err.message } };
+  }
   if (err instanceof BillingNotFoundError) {
-    if (err.message === "Unauthorized") {
-      return { status: 401, body: { error: "Unauthorized" } };
-    }
     return { status: 404, body: { error: err.message } };
   }
   return null;

@@ -34,6 +34,8 @@ const SubscriptionStrategySchema = z
     tierOrder: z.array(z.string()).optional(),
     trialDays: z.number().int().positive().optional(),
     singleSubscription: z.boolean().default(true),
+    /** Days after going past_due before entitlements are revoked. Omit to keep forever. */
+    pastDueGracePeriodDays: z.number().int().nonnegative().optional(),
   })
   .default({});
 

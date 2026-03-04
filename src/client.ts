@@ -15,6 +15,7 @@
 
 export interface BillingStatusResponse {
   entitlements: string[];
+  accessState: "active" | "trialing" | "grace_period" | "suspended" | "canceled" | "provider_missing" | "free";
   productId: string | null;
   productName: string | null;
   productDescription: string | null;

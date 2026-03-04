@@ -160,3 +160,20 @@ export function createTestUser(prefix: string, label: string): TestUser {
 export async function insertTestUser(sql: postgres.Sql, user: TestUser): Promise<void> {
   await sql`INSERT INTO users (id, email, name) VALUES (${user.id}, ${user.email}, ${user.name}) ON CONFLICT DO NOTHING`;
 }
+
+/**
+ * Insert a billing_customers row linking a user to a Stripe customer.
+ * This avoids relying on Stripe's Search API (which has indexing delay)
+ * when sync needs to find the provider customer.
+ */
+export async function insertBillingCustomer(
+  sql: postgres.Sql,
+  opts: { userId: string; providerCustomerId: string; email: string; name?: string },
+): Promise<void> {
+  const id = nanoid();
+  await sql`
+    INSERT INTO billing_customers (id, user_id, provider, provider_customer_id, email, name)
+    VALUES (${id}, ${opts.userId}, 'stripe', ${opts.providerCustomerId}, ${opts.email}, ${opts.name ?? null})
+    ON CONFLICT DO NOTHING
+  `;
+}

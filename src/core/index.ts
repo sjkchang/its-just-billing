@@ -9,10 +9,11 @@ export {
 export {
   BillingError,
   BillingBadRequestError,
+  BillingUnauthorizedError,
   BillingNotFoundError,
 } from "./errors";
 
-export type { BillingLogger } from "./types";
+export type { BillingLogger, BillingContext } from "./types";
 export { defaultLogger } from "./types";
 
 export {

@@ -5,12 +5,14 @@
 export { MockProductProvider } from "./products";
 export { MockCheckoutProvider } from "./checkout";
 export { MockCustomerProvider } from "./customers";
+export { MockSubscriptionProvider } from "./subscriptions";
 export { MockWebhookProvider } from "./webhooks";
 
 import { MockState } from "./shared";
 import { MockProductProvider } from "./products";
 import { MockCheckoutProvider } from "./checkout";
 import { MockCustomerProvider } from "./customers";
+import { MockSubscriptionProvider } from "./subscriptions";
 import { MockWebhookProvider } from "./webhooks";
 import type { BillingProviders } from "../types";
 import type { ProductEntry } from "../../core/config";
@@ -27,6 +29,7 @@ export function createMockProviders(logger?: BillingLogger, products?: ProductEn
     products: new MockProductProvider(log, products),
     checkout: new MockCheckoutProvider(state, log),
     customers: new MockCustomerProvider(state, log),
+    subscriptions: new MockSubscriptionProvider(state, log),
     webhooks: new MockWebhookProvider(log),
   };
 }

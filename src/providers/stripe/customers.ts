@@ -5,14 +5,12 @@
 import type Stripe from "stripe";
 import type { BillingLogger } from "../../core/types";
 import { defaultLogger } from "../../core/types";
-import { mapStripeSubscription, resolveRecurringPriceId, resolveRecurringPriceByInterval } from "./shared";
+import { mapStripeSubscription } from "./shared";
 import type {
   BillingCustomerProvider,
   BillingCustomer,
   BillingSubscription,
   CustomerState,
-  ChangeSubscriptionOptions,
-  SubscriptionChangeStrategy,
 } from "../types";
 
 function mapStripeCustomer(customer: Stripe.Customer): BillingCustomer {
@@ -23,19 +21,6 @@ function mapStripeCustomer(customer: Stripe.Customer): BillingCustomer {
     externalId: (customer.metadata?.externalId as string) ?? null,
     metadata: customer.metadata as Record<string, string> | undefined,
   };
-}
-
-function strategyToStripeProration(
-  strategy: import("../types").SubscriptionChangeStrategy
-): Stripe.SubscriptionUpdateParams.ProrationBehavior {
-  switch (strategy) {
-    case "immediate_prorate":
-      return "create_prorations";
-    case "immediate_full":
-      return "always_invoice";
-    case "at_period_end":
-      return "none";
-  }
 }
 
 export class StripeCustomerProvider implements BillingCustomerProvider {
@@ -56,11 +41,10 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
         return existing;
       }
 
-      const customer = await this.stripe.customers.create({
-        email,
-        name: name ?? undefined,
-        metadata: { externalId },
-      });
+      const customer = await this.stripe.customers.create(
+        { email, name: name ?? undefined, metadata: { externalId } },
+        { idempotencyKey: `billing-create-customer:${externalId}` },
+      );
 
       this.logger.info("Created Stripe customer", { customerId: customer.id, externalId });
 
@@ -143,164 +127,4 @@ export class StripeCustomerProvider implements BillingCustomerProvider {
     }
   }
 
-  async cancelSubscription(
-    subscriptionId: string,
-    cancelAtPeriodEnd = true
-  ): Promise<BillingSubscription> {
-    try {
-      const sub = cancelAtPeriodEnd
-        ? await this.stripe.subscriptions.update(subscriptionId, {
-            cancel_at_period_end: true,
-          })
-        : await this.stripe.subscriptions.cancel(subscriptionId);
-
-      return mapStripeSubscription(sub);
-    } catch (error) {
-      this.logger.error("Failed to cancel subscription", {
-        subscriptionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  async uncancelSubscription(subscriptionId: string): Promise<BillingSubscription> {
-    try {
-      const sub = await this.stripe.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: false,
-      });
-
-      this.logger.info("Uncanceled subscription", { subscriptionId });
-
-      return mapStripeSubscription(sub);
-    } catch (error) {
-      this.logger.error("Failed to uncancel subscription", {
-        subscriptionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  async changeSubscription(
-    subscriptionId: string,
-    options: ChangeSubscriptionOptions
-  ): Promise<BillingSubscription> {
-    try {
-      if (options.strategy === "at_period_end") {
-        return await this.scheduleChangeAtPeriodEnd(subscriptionId, options.productId, options.interval);
-      }
-
-      const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
-      const itemId = existing.items.data[0]?.id;
-      if (!itemId) {
-        throw new Error(`Subscription ${subscriptionId} has no items`);
-      }
-
-      // Release any existing schedule before immediate update (e.g. upgrade after pending downgrade)
-      if (existing.schedule) {
-        const scheduleId =
-          typeof existing.schedule === "string" ? existing.schedule : existing.schedule.id;
-        await this.stripe.subscriptionSchedules.release(scheduleId);
-        this.logger.info("Released existing schedule before immediate update", {
-          subscriptionId,
-          scheduleId,
-        });
-      }
-
-      const priceId = options.interval
-        ? await resolveRecurringPriceByInterval(this.stripe, options.productId, options.interval)
-        : await resolveRecurringPriceId(this.stripe, options.productId);
-
-      const sub = await this.stripe.subscriptions.update(subscriptionId, {
-        items: [{ id: itemId, price: priceId }],
-        proration_behavior: strategyToStripeProration(options.strategy),
-      });
-
-      this.logger.info("Updated subscription", {
-        subscriptionId,
-        newProductId: options.productId,
-        direction: options.direction,
-        strategy: options.strategy,
-      });
-
-      return mapStripeSubscription(sub);
-    } catch (error) {
-      this.logger.error("Failed to update subscription", {
-        subscriptionId,
-        options,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Schedule a subscription change at the end of the current billing period.
-   * Creates a Stripe subscription schedule with two phases: the current plan
-   * until period end, then the new plan going forward.
-   */
-  private async scheduleChangeAtPeriodEnd(
-    subscriptionId: string,
-    newProductId: string,
-    interval?: "day" | "week" | "month" | "year"
-  ): Promise<BillingSubscription> {
-    const existing = await this.stripe.subscriptions.retrieve(subscriptionId);
-
-    // If there's already a schedule, release it first (handles "change your mind" scenario)
-    if (existing.schedule) {
-      const scheduleId =
-        typeof existing.schedule === "string" ? existing.schedule : existing.schedule.id;
-      await this.stripe.subscriptionSchedules.release(scheduleId);
-      this.logger.info("Released existing schedule before creating new one", {
-        subscriptionId,
-        scheduleId,
-      });
-    }
-
-    // Convert subscription to a schedule (auto-creates one phase matching current state)
-    const schedule = await this.stripe.subscriptionSchedules.create({
-      from_subscription: subscriptionId,
-    });
-
-    // Resolve the new price
-    const newPriceId = interval
-      ? await resolveRecurringPriceByInterval(this.stripe, newProductId, interval)
-      : await resolveRecurringPriceId(this.stripe, newProductId);
-
-    // Get current phase details
-    const currentPhase = schedule.phases[0];
-    if (!currentPhase) {
-      throw new Error(`Schedule ${schedule.id} has no phases`);
-    }
-
-    // Update the schedule to add a second phase starting at period end
-    await this.stripe.subscriptionSchedules.update(schedule.id, {
-      phases: [
-        // Keep current phase as-is
-        {
-          items: currentPhase.items.map((item) => ({
-            price: typeof item.price === "string" ? item.price : item.price.id,
-            quantity: item.quantity ?? undefined,
-          })),
-          start_date: currentPhase.start_date,
-          end_date: currentPhase.end_date,
-        },
-        // New phase at period end
-        {
-          items: [{ price: newPriceId }],
-        },
-      ],
-    });
-
-    this.logger.info("Scheduled subscription change at period end", {
-      subscriptionId,
-      scheduleId: schedule.id,
-      newProductId,
-      transitionDate: new Date((currentPhase.end_date ?? 0) * 1000).toISOString(),
-    });
-
-    // Return current subscription state (still on old product)
-    return mapStripeSubscription(existing);
-  }
 }

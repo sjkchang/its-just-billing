@@ -7,12 +7,8 @@
  */
 
 import { nanoid } from "nanoid";
-import type { BillingProviders } from "../providers";
-import type { BillingProviderType } from "../core/entities";
-import type { BillingRepositories } from "../repositories/types";
 import { BillingBadRequestError } from "../core/errors";
-import type { BillingLogger, KeyValueCache } from "../core/types";
-import { defaultLogger } from "../core/types";
+import type { BillingContext } from "../core/types";
 import type { BillingSyncService } from "./sync";
 
 /** Cache TTL for webhook dedup keys (24 hours). */
@@ -20,12 +16,8 @@ const WEBHOOK_DEDUP_TTL_SECONDS = 86_400;
 
 export class BillingWebhookService {
   constructor(
-    private adapter: BillingRepositories,
+    private ctx: BillingContext,
     private syncService: BillingSyncService,
-    private billing: BillingProviders,
-    private billingProvider: BillingProviderType,
-    private logger: BillingLogger = defaultLogger,
-    private cache?: KeyValueCache
   ) {}
 
   /**
@@ -33,31 +25,32 @@ export class BillingWebhookService {
    * Verifies signature, extracts resource ID, and syncs state.
    */
   async handleWebhook(payload: string, headers: Record<string, string>): Promise<void> {
-    if (!this.billing.webhooks.verifySignature(payload, headers)) {
+    const verified = this.ctx.providers.webhooks.verifySignature(payload, headers);
+    if (!verified) {
       throw new BillingBadRequestError("Invalid webhook signature");
     }
 
-    const resource = this.billing.webhooks.extractResource(payload, headers);
+    const resource = this.ctx.providers.webhooks.extractResource(verified);
 
     if (!resource) {
-      this.logger.debug("Skipping webhook — irrelevant or unrecognized event");
+      this.ctx.logger.debug("Skipping webhook — irrelevant or unrecognized event");
       return;
     }
 
-    if (!this.billing.webhooks.isRelevantEvent(resource.eventType)) {
-      this.logger.debug("Ignoring webhook event type", { eventType: resource.eventType });
+    if (!this.ctx.providers.webhooks.isRelevantEvent(resource.eventType)) {
+      this.ctx.logger.debug("Ignoring webhook event type", { eventType: resource.eventType });
       return;
     }
 
-    const claimed = this.cache
+    const claimed = this.ctx.cache
       ? await this.claimViaCache(resource.eventId)
       : await this.claimViaDb(resource.eventId, resource.eventType);
 
     if (!claimed) return;
 
-    await this.syncService.syncCustomerState(resource.customerId, this.billingProvider);
+    await this.syncService.syncCustomerState(resource.customerId, this.ctx.providerType);
 
-    this.logger.info("Processed webhook", {
+    this.ctx.logger.info("Processed webhook", {
       eventId: resource.eventId,
       eventType: resource.eventType,
       customerId: resource.customerId,
@@ -71,16 +64,26 @@ export class BillingWebhookService {
   private async claimViaCache(eventId: string): Promise<boolean> {
     const key = `billing:webhook:dedup:${eventId}`;
     try {
-      const existing = await this.cache!.get(key);
+      // Prefer atomic setIfAbsent to avoid TOCTOU race between concurrent webhooks
+      if (this.ctx.cache!.setIfAbsent) {
+        const claimed = await this.ctx.cache!.setIfAbsent(key, "1", WEBHOOK_DEDUP_TTL_SECONDS);
+        if (!claimed) {
+          this.ctx.logger.debug("Webhook event already processed (cache)", { eventId });
+        }
+        return claimed;
+      }
+
+      // Fallback: non-atomic get-then-set — may cause a duplicate run under concurrency
+      const existing = await this.ctx.cache!.get(key);
       if (existing) {
-        this.logger.debug("Webhook event already processed (cache)", { eventId });
+        this.ctx.logger.debug("Webhook event already processed (cache)", { eventId });
         return false;
       }
-      await this.cache!.set(key, "1", WEBHOOK_DEDUP_TTL_SECONDS);
+      await this.ctx.cache!.set(key, "1", WEBHOOK_DEDUP_TTL_SECONDS);
       return true;
     } catch {
       // Cache failure — allow processing to avoid dropping events
-      this.logger.warn("Webhook dedup cache error, proceeding with event", { eventId });
+      this.ctx.logger.warn("Webhook dedup cache error, proceeding with event", { eventId });
       return true;
     }
   }
@@ -90,16 +93,16 @@ export class BillingWebhookService {
    * Falls back to unique constraint for concurrency safety.
    */
   private async claimViaDb(eventId: string, eventType: string): Promise<boolean> {
-    const alreadyProcessed = await this.adapter.events.exists(eventId);
+    const alreadyProcessed = await this.ctx.adapter.events.exists(eventId);
     if (alreadyProcessed) {
-      this.logger.debug("Webhook event already processed", { eventId });
+      this.ctx.logger.debug("Webhook event already processed", { eventId });
       return false;
     }
 
     try {
-      await this.adapter.events.create({
+      await this.ctx.adapter.events.create({
         id: nanoid(),
-        provider: this.billingProvider,
+        provider: this.ctx.providerType,
         providerEventId: eventId,
         eventType,
         payload: null,
@@ -107,7 +110,7 @@ export class BillingWebhookService {
       return true;
     } catch {
       // Unique constraint violation — another request already claimed this event
-      this.logger.debug("Webhook event already processed (concurrent)", { eventId });
+      this.ctx.logger.debug("Webhook event already processed (concurrent)", { eventId });
       return false;
     }
   }

@@ -19,6 +19,7 @@ import {
   teardownDatabase,
   createTestUser,
   insertTestUser,
+  insertBillingCustomer,
   type E2EContext,
 } from "./helpers/setup";
 import { StripeCleanup } from "./helpers/cleanup";
@@ -71,8 +72,8 @@ describeE2E("Billing lifecycle", () => {
       config: {
         products,
         entitlements: {
-          free: ["basic"],
-          byProduct: {
+          defaultFree: ["basic"],
+          products: {
             [`${ctx.runPrefix}_starter`]: ["basic", "starter"],
             [`${ctx.runPrefix}_pro`]: ["basic", "starter", "pro"],
           },
@@ -161,7 +162,7 @@ describeE2E("Billing lifecycle", () => {
     setTestUser("token-carol", carol);
 
     // Create subscription directly in Stripe
-    const { subscription } = await createStripeSubscription(
+    const { customer: stripeCarol, subscription } = await createStripeSubscription(
       STRIPE_KEY!,
       {
         productId: `${ctx.runPrefix}_starter`,
@@ -172,6 +173,14 @@ describeE2E("Billing lifecycle", () => {
       cleanup,
     );
     expect(subscription.status).toBe("active");
+
+    // Link local billing customer so sync doesn't rely on Stripe Search indexing
+    await insertBillingCustomer(ctx.sql, {
+      userId: carol.id,
+      providerCustomerId: stripeCarol.id,
+      email: carol.email,
+      name: carol.name,
+    });
 
     // Sync state into local DB
     const syncRes = await app.request(
@@ -201,7 +210,7 @@ describeE2E("Billing lifecycle", () => {
     setTestUser("token-dave", dave);
 
     // Create subscription
-    await createStripeSubscription(
+    const { customer: stripeDave } = await createStripeSubscription(
       STRIPE_KEY!,
       {
         productId: `${ctx.runPrefix}_starter`,
@@ -211,6 +220,13 @@ describeE2E("Billing lifecycle", () => {
       },
       cleanup,
     );
+
+    await insertBillingCustomer(ctx.sql, {
+      userId: dave.id,
+      providerCustomerId: stripeDave.id,
+      email: dave.email,
+      name: dave.name,
+    });
 
     // Sync first
     await app.request(authedRequest("POST", "/sync", "token-dave"));
@@ -240,7 +256,7 @@ describeE2E("Billing lifecycle", () => {
     setTestUser("token-eve", eve);
 
     // Create subscription
-    await createStripeSubscription(
+    const { customer: stripeEve } = await createStripeSubscription(
       STRIPE_KEY!,
       {
         productId: `${ctx.runPrefix}_starter`,
@@ -250,6 +266,13 @@ describeE2E("Billing lifecycle", () => {
       },
       cleanup,
     );
+
+    await insertBillingCustomer(ctx.sql, {
+      userId: eve.id,
+      providerCustomerId: stripeEve.id,
+      email: eve.email,
+      name: eve.name,
+    });
 
     // Sync
     await app.request(authedRequest("POST", "/sync", "token-eve"));

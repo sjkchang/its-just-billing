@@ -2,18 +2,26 @@
  * Billing status service — resolves user billing status and entitlements.
  */
 
-import type { BillingProviders } from "../providers";
-import type { BillingProviderType, Subscription, SubscriptionStatus } from "../core/entities";
+import type { Subscription, SubscriptionStatus } from "../core/entities";
 import { getActiveSubscription, getStatusMessage, EntitlementResolver } from "../core/domain";
-import type { BillingAppConfig, ProductEntry } from "../core/config";
+import type { ProductEntry } from "../core/config";
 import { getConfiguredProductIds } from "../core/config";
-import type { BillingRepositories } from "../repositories/types";
 import type { BillingUser } from "../core/hooks";
-import type { BillingLogger, KeyValueCache } from "../core/types";
-import { defaultLogger } from "../core/types";
+import type { BillingContext } from "../core/types";
+
+/** Describes whether the user currently has access to paid features. */
+export type AccessState =
+  | "active"           // Normal paid access
+  | "trialing"         // Trial period
+  | "grace_period"     // Payment past due, still within grace period
+  | "suspended"        // Payment past due, grace period expired — entitlements revoked
+  | "canceled"         // Subscription canceled
+  | "provider_missing" // Subscription exists locally but not found in provider
+  | "free";            // No subscription
 
 export interface BillingStatusResult {
   entitlements: string[];
+  accessState: AccessState;
   productId: string | null;
   productName: string | null;
   productDescription: string | null;
@@ -44,18 +52,13 @@ export class BillingStatusService {
   private entitlementResolver: EntitlementResolver;
   private configuredProducts: ProductEntry[] | undefined;
   private productDisplay: "configured" | "all";
+  private pastDueGracePeriodDays: number | undefined;
 
-  constructor(
-    private adapter: BillingRepositories,
-    private billing: BillingProviders,
-    private billingProvider: BillingProviderType,
-    config: BillingAppConfig,
-    private cache?: KeyValueCache,
-    private logger: BillingLogger = defaultLogger
-  ) {
-    this.entitlementResolver = new EntitlementResolver(config.entitlements);
-    this.configuredProducts = config.products;
-    this.productDisplay = config.productDisplay;
+  constructor(private ctx: BillingContext) {
+    this.entitlementResolver = new EntitlementResolver(ctx.config.entitlements);
+    this.configuredProducts = ctx.config.products;
+    this.productDisplay = ctx.config.productDisplay;
+    this.pastDueGracePeriodDays = ctx.config.subscriptions.pastDueGracePeriodDays;
   }
 
   /**
@@ -66,9 +69,9 @@ export class BillingStatusService {
     const cacheKey = `billing:status:${user.id}`;
 
     // Check cache
-    if (this.cache) {
+    if (this.ctx.cache) {
       try {
-        const cached = await this.cache.get(cacheKey);
+        const cached = await this.ctx.cache.get(cacheKey);
         if (cached) {
           const parsed = JSON.parse(cached) as BillingStatusResult;
           // Reconstruct Date from serialized string
@@ -78,41 +81,73 @@ export class BillingStatusService {
           return parsed;
         }
       } catch (err) {
-        this.logger.warn("Failed to read billing status from cache", {
+        this.ctx.logger.warn("Failed to read billing status from cache", {
           userId: user.id,
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
 
-    const customer = await this.adapter.customers.findByUserId(user.id, this.billingProvider);
+    const customer = await this.ctx.adapter.customers.findByUserId(user.id, this.ctx.providerType);
     let activeSubscription: Subscription | null = null;
 
+    let providerMissingSub: Subscription | null = null;
+
     if (customer) {
-      const subscriptions = await this.adapter.subscriptions.findByCustomerId(customer.id);
+      const subscriptions = await this.ctx.adapter.subscriptions.findByCustomerId(customer.id);
       activeSubscription = getActiveSubscription(subscriptions);
+      if (!activeSubscription) {
+        providerMissingSub = subscriptions.find((s) => s.status === "provider_missing") ?? null;
+      }
     }
 
-    if (!activeSubscription) {
+    if (!activeSubscription && !providerMissingSub) {
       const result = this.buildFreeStatus();
       await this.cacheSet(cacheKey, result);
       return result;
     }
 
-    const product = await this.billing.products.getProduct(activeSubscription.providerProductId);
+    if (!activeSubscription && providerMissingSub) {
+      const result: BillingStatusResult = {
+        entitlements: Array.from(this.entitlementResolver.resolve([])),
+        accessState: "provider_missing",
+        productId: providerMissingSub.providerProductId,
+        productName: null,
+        productDescription: null,
+        subscription: {
+          id: providerMissingSub.id,
+          status: providerMissingSub.status,
+          currentPeriodEnd: providerMissingSub.currentPeriodEnd,
+          pendingCancellation: false,
+        },
+        statusMessage: "Subscription not found in billing provider",
+        metadata: null,
+      };
+      await this.cacheSet(cacheKey, result);
+      return result;
+    }
 
-    const entitlements = this.entitlementResolver.resolve([activeSubscription.providerProductId]);
+    // Both early returns above handle the null cases
+    const sub = activeSubscription!;
+    const product = await this.ctx.providers.products.getProduct(sub.providerProductId);
+    const accessState = this.resolveAccessState(sub);
+    const grantPaidEntitlements = accessState !== "suspended" && accessState !== "canceled";
+
+    const entitlements = grantPaidEntitlements
+      ? this.entitlementResolver.resolve([sub.providerProductId])
+      : this.entitlementResolver.resolve([]);
 
     const result: BillingStatusResult = {
       entitlements: Array.from(entitlements),
-      productId: activeSubscription.providerProductId,
+      accessState,
+      productId: sub.providerProductId,
       productName: product?.name ?? null,
       productDescription: product?.description ?? null,
       subscription: {
-        id: activeSubscription.id,
-        status: activeSubscription.status,
-        currentPeriodEnd: activeSubscription.currentPeriodEnd,
-        pendingCancellation: activeSubscription.pendingCancellation,
+        id: sub.id,
+        status: sub.status,
+        currentPeriodEnd: sub.currentPeriodEnd,
+        pendingCancellation: sub.pendingCancellation,
       },
       statusMessage: getStatusMessage(activeSubscription),
       metadata: product?.metadata ?? null,
@@ -134,20 +169,20 @@ export class BillingStatusService {
     const cacheKey = "billing:products";
 
     // Check cache
-    if (this.cache) {
+    if (this.ctx.cache) {
       try {
-        const cached = await this.cache.get(cacheKey);
+        const cached = await this.ctx.cache.get(cacheKey);
         if (cached) {
           return JSON.parse(cached) as ProductResult[];
         }
       } catch (err) {
-        this.logger.warn("Failed to read products from cache", {
+        this.ctx.logger.warn("Failed to read products from cache", {
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
 
-    const productList = await this.billing.products.listProducts();
+    const productList = await this.ctx.providers.products.listProducts();
 
     const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "day" | "week" | "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
       id: prod.id,
@@ -211,11 +246,11 @@ export class BillingStatusService {
    * Write a value to the cache. Failures are logged and swallowed.
    */
   private async cacheSet(key: string, value: unknown, ttl = 300): Promise<void> {
-    if (!this.cache) return;
+    if (!this.ctx.cache) return;
     try {
-      await this.cache.set(key, JSON.stringify(value), ttl);
+      await this.ctx.cache.set(key, JSON.stringify(value), ttl);
     } catch (err) {
-      this.logger.warn("Failed to write to cache", {
+      this.ctx.logger.warn("Failed to write to cache", {
         key,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -225,10 +260,30 @@ export class BillingStatusService {
   /**
    * Build a free tier status result.
    */
+  private resolveAccessState(subscription: Subscription): AccessState {
+    if (subscription.status === "trialing") return "trialing";
+    if (subscription.status === "canceled") return "canceled";
+
+    if (subscription.status === "past_due") {
+      if (this.pastDueGracePeriodDays == null) return "grace_period"; // undefined = keep forever
+      if (this.pastDueGracePeriodDays === 0) return "suspended"; // 0 = immediate suspension
+      const pastDueSince = subscription.currentPeriodEnd ?? subscription.updatedAt;
+      if (pastDueSince) {
+        const elapsed = Date.now() - new Date(pastDueSince).getTime();
+        const gracePeriodMs = this.pastDueGracePeriodDays * 24 * 60 * 60 * 1000;
+        return elapsed > gracePeriodMs ? "suspended" : "grace_period";
+      }
+      return "grace_period";
+    }
+
+    return "active";
+  }
+
   private buildFreeStatus(): BillingStatusResult {
     const entitlements = this.entitlementResolver.resolve([]);
     return {
       entitlements: Array.from(entitlements),
+      accessState: "free",
       productId: null,
       productName: "Free",
       productDescription: null,

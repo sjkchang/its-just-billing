@@ -10,7 +10,6 @@ import type {
   BillingCustomer,
   BillingSubscription,
   CustomerState,
-  ChangeSubscriptionOptions,
 } from "../types";
 
 export class MockCustomerProvider implements BillingCustomerProvider {
@@ -77,68 +76,4 @@ export class MockCustomerProvider implements BillingCustomerProvider {
     return subscription;
   }
 
-  async cancelSubscription(
-    subscriptionId: string,
-    cancelAtPeriodEnd = true
-  ): Promise<BillingSubscription> {
-    const subscription = this.state.subscriptions.get(subscriptionId);
-    if (!subscription) {
-      throw new Error(`Subscription not found: ${subscriptionId}`);
-    }
-    const updated: BillingSubscription = {
-      ...subscription,
-      pendingCancellation: cancelAtPeriodEnd,
-      canceledAt: new Date(),
-      status: cancelAtPeriodEnd ? subscription.status : "canceled",
-    };
-    this.state.subscriptions.set(subscriptionId, updated);
-    this.logger.debug("[Mock Billing] Canceled subscription", {
-      subscriptionId,
-      cancelAtPeriodEnd,
-    });
-    return updated;
-  }
-
-  async uncancelSubscription(subscriptionId: string): Promise<BillingSubscription> {
-    const subscription = this.state.subscriptions.get(subscriptionId);
-    if (!subscription) {
-      throw new Error(`Subscription not found: ${subscriptionId}`);
-    }
-    const updated: BillingSubscription = {
-      ...subscription,
-      pendingCancellation: false,
-      canceledAt: null,
-    };
-    this.state.subscriptions.set(subscriptionId, updated);
-    this.logger.debug("[Mock Billing] Uncanceled subscription", { subscriptionId });
-    return updated;
-  }
-
-  async changeSubscription(
-    subscriptionId: string,
-    options: ChangeSubscriptionOptions
-  ): Promise<BillingSubscription> {
-    const subscription = this.state.subscriptions.get(subscriptionId);
-    if (!subscription) {
-      throw new Error(`Subscription not found: ${subscriptionId}`);
-    }
-    const updated: BillingSubscription = {
-      ...subscription,
-      productId: options.productId,
-      priceId: options.interval
-        ? `${options.productId}_price_${options.interval}`
-        : subscription.priceId,
-      pendingCancellation: false,
-      canceledAt: null,
-    };
-    this.state.subscriptions.set(subscriptionId, updated);
-    this.logger.debug("[Mock Billing] Updated subscription", {
-      subscriptionId,
-      newProductId: options.productId,
-      direction: options.direction,
-      strategy: options.strategy,
-      interval: options.interval,
-    });
-    return updated;
-  }
 }

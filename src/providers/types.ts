@@ -86,12 +86,31 @@ export interface WebhookResource {
  */
 export type SubscriptionChangeStrategy = "immediate_prorate" | "immediate_full" | "at_period_end";
 
+/** Whether a cancellation takes effect immediately or at the end of the billing period. */
+export type CancellationTiming = "immediate" | "at_period_end";
+
 export interface ChangeSubscriptionOptions {
   productId: string;
   direction: "upgrade" | "downgrade" | "sidegrade";
   strategy: SubscriptionChangeStrategy;
   interval?: "day" | "week" | "month" | "year";
 }
+
+// ============================================================================
+// Strategy Handlers
+// ============================================================================
+
+/** Handler for a single subscription-change strategy. */
+export type ChangeStrategyHandler = (
+  subscriptionId: string,
+  productId: string,
+  interval?: "day" | "week" | "month" | "year"
+) => Promise<BillingSubscription>;
+
+/** Handler for a single cancellation timing. */
+export type CancelStrategyHandler = (
+  subscriptionId: string
+) => Promise<BillingSubscription>;
 
 // ============================================================================
 // Sub-Provider Interfaces
@@ -115,20 +134,19 @@ export interface BillingCustomerProvider {
   getCustomerByExternalId(externalId: string): Promise<BillingCustomer | null>;
   getCustomerState(customerId: string): Promise<CustomerState | null>;
   getSubscription(subscriptionId: string): Promise<BillingSubscription | null>;
-  cancelSubscription(
-    subscriptionId: string,
-    cancelAtPeriodEnd?: boolean
-  ): Promise<BillingSubscription>;
-  uncancelSubscription(subscriptionId: string): Promise<BillingSubscription>;
-  changeSubscription(
-    subscriptionId: string,
-    options: ChangeSubscriptionOptions
-  ): Promise<BillingSubscription>;
+}
+
+export interface BillingSubscriptionProvider {
+  changeHandlers: Partial<Record<SubscriptionChangeStrategy, ChangeStrategyHandler>>;
+  cancelHandlers: Partial<Record<CancellationTiming, CancelStrategyHandler>>;
+  uncancel(subscriptionId: string): Promise<BillingSubscription>;
 }
 
 export interface BillingWebhookProvider {
-  verifySignature(payload: string, headers: Record<string, string>): boolean;
-  extractResource(payload: string, headers: Record<string, string>): WebhookResource | null;
+  /** Verify the webhook signature. Returns the verified payload for use with extractResource, or null if invalid. */
+  verifySignature(payload: string, headers: Record<string, string>): unknown | null;
+  /** Extract the resource from a verified payload returned by verifySignature. */
+  extractResource(verifiedPayload: unknown): WebhookResource | null;
   isRelevantEvent(eventType: string): boolean;
 }
 
@@ -140,6 +158,7 @@ export interface BillingProviders {
   products: BillingProductProvider;
   checkout: BillingCheckoutProvider;
   customers: BillingCustomerProvider;
+  subscriptions: BillingSubscriptionProvider;
   webhooks: BillingWebhookProvider;
 }
 

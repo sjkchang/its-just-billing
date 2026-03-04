@@ -65,8 +65,9 @@ export function getActiveSubscription(subscriptions: Subscription[]): Subscripti
       if (a.pendingCancellation !== b.pendingCancellation) {
         return a.pendingCancellation ? 1 : -1;
       }
-      // Then newest first
-      return b.createdAt.getTime() - a.createdAt.getTime();
+      // Then newest first, with ID as tiebreaker for determinism
+      const byDate = b.createdAt.getTime() - a.createdAt.getTime();
+      return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
     });
   return active[0] ?? null;
 }
@@ -152,9 +153,48 @@ export function getStatusMessage(subscription: Subscription | null): string {
       return "Awaiting payment confirmation";
     case "incomplete_expired":
       return "Payment confirmation expired";
+    case "provider_missing":
+      return "Subscription not found in billing provider";
     default:
       return "Unknown status";
   }
+}
+
+// ============================================================================
+// Price Helpers
+// ============================================================================
+
+/**
+ * Get the lowest monthly-equivalent price from a product's price list.
+ * Normalizes day/week/year intervals to monthly for comparison.
+ * Skips one_time prices since they aren't comparable to recurring.
+ */
+export function getLowestMonthlyPrice(product: {
+  prices: { amount: number; interval: string }[];
+}): number {
+  let lowest = Infinity;
+  for (const price of product.prices) {
+    let monthly: number;
+    switch (price.interval) {
+      case "day":
+        monthly = price.amount * 30;
+        break;
+      case "week":
+        monthly = price.amount * 4;
+        break;
+      case "year":
+        monthly = price.amount / 12;
+        break;
+      case "month":
+        monthly = price.amount;
+        break;
+      default:
+        // Skip one_time or unknown intervals
+        continue;
+    }
+    if (monthly < lowest) lowest = monthly;
+  }
+  return lowest === Infinity ? 0 : lowest;
 }
 
 // ============================================================================

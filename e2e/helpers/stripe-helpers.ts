@@ -1,8 +1,8 @@
 /**
  * Stripe helpers — create customers/subscriptions directly in Stripe for testing.
  *
- * Uses `pm_card_visa` test payment method to create subscriptions without
- * going through the Checkout flow (which requires a browser).
+ * Creates a test PaymentMethod via the Stripe token API, then uses it
+ * to create subscriptions without going through the Checkout flow.
  */
 
 import Stripe from "stripe";
@@ -25,13 +25,19 @@ export async function createStripeSubscription(
 ): Promise<CreateSubscriptionResult> {
   const stripe = new Stripe(secretKey);
 
+  // Create a test payment method from the tok_visa token
+  const pm = await stripe.paymentMethods.create({
+    type: "card",
+    card: { token: "tok_visa" },
+  });
+
   // Create customer with externalId metadata (matching what billing package sets)
   const customer = await stripe.customers.create({
     email: opts.email,
     name: opts.name,
     metadata: { externalId: opts.userId },
-    payment_method: "pm_card_visa",
-    invoice_settings: { default_payment_method: "pm_card_visa" },
+    payment_method: pm.id,
+    invoice_settings: { default_payment_method: pm.id },
   });
   cleanup.trackCustomer(customer.id);
 
@@ -41,13 +47,14 @@ export async function createStripeSubscription(
     ? product.default_price
     : product.default_price?.id;
 
+  let resolvedPriceId: string;
   if (!priceId) {
     // Fallback: list prices
     const prices = await stripe.prices.list({ product: opts.productId, active: true, limit: 1 });
     if (prices.data.length === 0) {
       throw new Error(`No active price found for product ${opts.productId}`);
     }
-    var resolvedPriceId = prices.data[0].id;
+    resolvedPriceId = prices.data[0].id;
   } else {
     resolvedPriceId = priceId;
   }
@@ -56,7 +63,7 @@ export async function createStripeSubscription(
   const subscription = await stripe.subscriptions.create({
     customer: customer.id,
     items: [{ price: resolvedPriceId }],
-    default_payment_method: "pm_card_visa",
+    default_payment_method: pm.id,
   });
   cleanup.trackSubscription(subscription.id);
 

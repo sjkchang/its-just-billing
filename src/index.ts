@@ -58,6 +58,7 @@ export {
   daysUntilEnd,
   getChangeDirection,
   getStatusMessage,
+  getLowestMonthlyPrice,
   EntitlementResolver,
 } from "./core/domain";
 export type { Entitlement, EntitlementSet, EntitlementConfig } from "./core/domain";
@@ -109,10 +110,14 @@ export type {
   CheckoutOptions,
   WebhookResource,
   SubscriptionChangeStrategy,
+  CancellationTiming,
   ChangeSubscriptionOptions,
+  ChangeStrategyHandler,
+  CancelStrategyHandler,
   BillingProductProvider,
   BillingCheckoutProvider,
   BillingCustomerProvider,
+  BillingSubscriptionProvider,
   BillingWebhookProvider,
   BillingProviders,
   BillingProviderConfig,
@@ -120,7 +125,7 @@ export type {
 
 // Service classes + types (for advanced usage / testing)
 export { BillingStatusService } from "./services/status";
-export type { BillingStatusResult, ProductResult } from "./services/status";
+export type { AccessState, BillingStatusResult, ProductResult } from "./services/status";
 export { BillingCheckoutService } from "./services/checkout";
 export type {
   CheckoutInput,

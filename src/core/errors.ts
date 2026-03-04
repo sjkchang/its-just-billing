@@ -19,6 +19,13 @@ export class BillingBadRequestError extends BillingError {
   }
 }
 
+export class BillingUnauthorizedError extends BillingError {
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "BillingUnauthorizedError";
+  }
+}
+
 export class BillingNotFoundError extends BillingError {
   constructor(message = "Not found") {
     super(message);

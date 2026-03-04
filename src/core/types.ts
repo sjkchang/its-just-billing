@@ -22,6 +22,20 @@ export interface KeyValueCache {
   get(key: string): Promise<string | null | undefined>;
   set(key: string, value: string, ttl?: number): Promise<void>;
   delete(key: string): Promise<void>;
+  /** Atomic set-if-not-exists. Returns true if the key was set. */
+  setIfAbsent?(key: string, value: string, ttl?: number): Promise<boolean>;
+}
+
+/**
+ * BillingContext — shared dependencies passed to all services.
+ */
+export interface BillingContext {
+  adapter: import("../repositories/types").BillingRepositories;
+  providers: import("../providers/types").BillingProviders;
+  providerType: import("./entities").BillingProviderType;
+  config: import("./config").BillingAppConfig;
+  logger: BillingLogger;
+  cache?: KeyValueCache;
 }
 
 export const defaultLogger: BillingLogger = {

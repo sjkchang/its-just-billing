@@ -6,25 +6,14 @@
  */
 
 import { nanoid } from "nanoid";
-import type { BillingProviders } from "../providers";
 import type { BillingProviderType, Customer, Subscription } from "../core/entities";
 import { isActive, hasEnded } from "../core/domain";
-import type { BillingRepositories } from "../repositories/types";
-import type { BillingAppConfig } from "../core/config";
 import { runAfterHook } from "../core/hooks";
 import type { BillingUser } from "../core/hooks";
-import type { BillingLogger, KeyValueCache } from "../core/types";
-import { defaultLogger } from "../core/types";
+import type { BillingContext } from "../core/types";
 
 export class BillingSyncService {
-  constructor(
-    private adapter: BillingRepositories,
-    private billing: BillingProviders,
-    private billingProvider: BillingProviderType,
-    private config: BillingAppConfig,
-    private logger: BillingLogger = defaultLogger,
-    private cache?: KeyValueCache
-  ) {}
+  constructor(private ctx: BillingContext) {}
 
   /** Per-user sync cooldown in seconds. */
   private static readonly SYNC_COOLDOWN_SECONDS = 10;
@@ -38,12 +27,12 @@ export class BillingSyncService {
    * abuse that could exhaust the provider's API rate limit.
    */
   async syncBillingState(user: BillingUser): Promise<void> {
-    if (this.cache) {
+    if (this.ctx.cache) {
       const cooldownKey = `billing:sync:cooldown:${user.id}`;
       try {
-        const active = await this.cache.get(cooldownKey);
+        const active = await this.ctx.cache.get(cooldownKey);
         if (active) {
-          this.logger.debug("Skipping sync — cooldown active", { userId: user.id });
+          this.ctx.logger.debug("Skipping sync — cooldown active", { userId: user.id });
           return;
         }
       } catch {
@@ -51,8 +40,8 @@ export class BillingSyncService {
       }
     }
 
-    const provider = this.billingProvider;
-    const customer = await this.adapter.customers.findByUserId(user.id, provider);
+    const provider = this.ctx.providerType;
+    const customer = await this.ctx.adapter.customers.findByUserId(user.id, provider);
 
     if (customer) {
       await this.syncCustomerState(customer.providerCustomerId, provider);
@@ -61,10 +50,10 @@ export class BillingSyncService {
     }
 
     // No local customer — check if one exists in the provider
-    const providerCustomer = await this.billing.customers.getCustomerByExternalId(user.id);
+    const providerCustomer = await this.ctx.providers.customers.getCustomerByExternalId(user.id);
 
     if (!providerCustomer) {
-      this.logger.debug("No billing customer found for user", { userId: user.id });
+      this.ctx.logger.debug("No billing customer found for user", { userId: user.id });
       await this.setSyncCooldown(user.id);
       return;
     }
@@ -74,9 +63,9 @@ export class BillingSyncService {
   }
 
   private async setSyncCooldown(userId: string): Promise<void> {
-    if (!this.cache) return;
+    if (!this.ctx.cache) return;
     try {
-      await this.cache.set(
+      await this.ctx.cache.set(
         `billing:sync:cooldown:${userId}`,
         "1",
         BillingSyncService.SYNC_COOLDOWN_SECONDS
@@ -94,49 +83,50 @@ export class BillingSyncService {
     providerCustomerId: string,
     provider: BillingProviderType
   ): Promise<void> {
-    this.logger.info("syncCustomerState called", { providerCustomerId });
+    this.ctx.logger.info("syncCustomerState called", { providerCustomerId });
 
-    const state = await this.billing.customers.getCustomerState(providerCustomerId);
+    const state = await this.ctx.providers.customers.getCustomerState(providerCustomerId);
 
-    this.logger.info("Got customer state from provider", {
+    this.ctx.logger.info("Got customer state from provider", {
       providerCustomerId,
       hasState: !!state,
       subscriptionCount: state?.subscriptions?.length ?? 0,
     });
 
     if (!state) {
-      this.logger.warn("Could not fetch customer state from provider", { providerCustomerId });
+      this.ctx.logger.warn("Could not fetch customer state from provider", { providerCustomerId });
       return;
     }
 
     if (!state.customer.externalId) {
-      const hasLocal = await this.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
+      const hasLocal = await this.ctx.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
       if (!hasLocal) {
-        this.logger.error("Cannot create customer without externalId", { providerCustomerId });
+        this.ctx.logger.error("Cannot create customer without externalId", { providerCustomerId });
         return;
       }
     }
 
     // Snapshot local subscriptions before transaction (for transition detection)
-    const preCustomer = await this.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
+    const preCustomer = await this.ctx.adapter.customers.findByProviderCustomerId(providerCustomerId, provider);
     const preSubs: Subscription[] = preCustomer
-      ? await this.adapter.subscriptions.findByCustomerId(preCustomer.id)
+      ? await this.ctx.adapter.subscriptions.findByCustomerId(preCustomer.id)
       : [];
 
     let syncedCustomer: Customer | null = null;
+    let postSubs: Subscription[] = [];
 
-    await this.adapter.transaction(async (txAdapter) => {
+    await this.ctx.adapter.transaction(async (txAdapter) => {
       let customer = await txAdapter.customers.findByProviderCustomerId(providerCustomerId, provider);
 
       if (!customer) {
         if (!state.customer.externalId) {
-          this.logger.error("Cannot create customer without externalId (inside transaction)", {
+          this.ctx.logger.error("Cannot create customer without externalId (inside transaction)", {
             providerCustomerId,
           });
           return;
         }
 
-        this.logger.warn("Customer not found locally, creating from provider state", {
+        this.ctx.logger.warn("Customer not found locally, creating from provider state", {
           providerCustomerId,
         });
 
@@ -174,15 +164,16 @@ export class BillingSyncService {
         });
       }
 
-      // Mark local subscriptions not in provider response as canceled.
+      // Flag local subscriptions not returned by the provider.
+      // Uses `provider_missing` rather than `canceled` to preserve the distinction
+      // between user-initiated cancellations and provider sync gaps.
       const localSubscriptions = await txAdapter.subscriptions.findByCustomerId(customer.id);
       for (const local of localSubscriptions) {
         if (!activeProviderIds.has(local.providerSubscriptionId) && isActive(local)) {
           await txAdapter.subscriptions.update(local.id, {
-            status: "canceled",
-            canceledAt: local.canceledAt ?? new Date(),
+            status: "provider_missing",
           });
-          this.logger.info("Marked subscription as canceled (missing from provider)", {
+          this.ctx.logger.warn("Subscription missing from provider", {
             subscriptionId: local.id,
             providerSubscriptionId: local.providerSubscriptionId,
           });
@@ -190,8 +181,9 @@ export class BillingSyncService {
       }
 
       syncedCustomer = customer;
+      postSubs = await txAdapter.subscriptions.findByCustomerId(customer.id);
 
-      this.logger.info("Synced customer state", {
+      this.ctx.logger.info("Synced customer state", {
         customerId: customer.id,
         subscriptionCount: state.subscriptions.length,
       });
@@ -200,11 +192,11 @@ export class BillingSyncService {
     const resolvedCustomer = syncedCustomer as Customer | null;
 
     // Invalidate status cache after sync
-    if (resolvedCustomer && this.cache) {
+    if (resolvedCustomer && this.ctx.cache) {
       try {
-        await this.cache.delete(`billing:status:${resolvedCustomer.userId}`);
+        await this.ctx.cache.delete(`billing:status:${resolvedCustomer.userId}`);
       } catch (err) {
-        this.logger.warn("Failed to invalidate status cache after sync", {
+        this.ctx.logger.warn("Failed to invalidate status cache after sync", {
           userId: resolvedCustomer.userId,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -213,18 +205,17 @@ export class BillingSyncService {
 
     // Fire subscription lifecycle hooks outside the transaction
     if (resolvedCustomer) {
-      this.fireTransitionHooks(resolvedCustomer, preSubs);
+      this.fireTransitionHooks(resolvedCustomer, preSubs, postSubs);
     }
   }
 
   /**
    * Compare pre-sync and post-sync subscription state to fire lifecycle hooks.
    */
-  private async fireTransitionHooks(customer: Customer, preSubs: Subscription[]): Promise<void> {
-    const hooks = this.config.hooks?.lifecycle;
+  private fireTransitionHooks(customer: Customer, preSubs: Subscription[], postSubs: Subscription[]): void {
+    const hooks = this.ctx.config.hooks?.lifecycle;
     if (!hooks) return;
 
-    const postSubs = await this.adapter.subscriptions.findByCustomerId(customer.id);
     const preMap = new Map(preSubs.map((s) => [s.providerSubscriptionId, s]));
 
     for (const post of postSubs) {
@@ -236,7 +227,7 @@ export class BillingSyncService {
           hooks.onSubscriptionActivated,
           { customer, subscription: post },
           "lifecycle.onSubscriptionActivated",
-          this.logger
+          this.ctx.logger
         );
       }
 
@@ -247,7 +238,7 @@ export class BillingSyncService {
             hooks.onSubscriptionCanceled,
             { customer, subscription: post },
             "lifecycle.onSubscriptionCanceled",
-            this.logger
+            this.ctx.logger
           );
         }
       }
@@ -263,7 +254,7 @@ export class BillingSyncService {
             newProductId: post.providerProductId,
           },
           "lifecycle.onSubscriptionChanged",
-          this.logger
+          this.ctx.logger
         );
       }
 
@@ -273,7 +264,7 @@ export class BillingSyncService {
           hooks.onSubscriptionExpired,
           { customer, subscription: post },
           "lifecycle.onSubscriptionExpired",
-          this.logger
+          this.ctx.logger
         );
       }
     }
