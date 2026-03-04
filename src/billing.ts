@@ -6,7 +6,7 @@
  */
 
 import type { BillingProviderConfig } from "./providers";
-import type { BillingAppConfig } from "./core/config";
+import type { BillingAppConfigInput } from "./core/config";
 import { BillingConfigSchema, getManagedProducts } from "./core/config";
 import type { BillingRepositories } from "./repositories/types";
 import type { BillingUser } from "./core/hooks";
@@ -33,7 +33,7 @@ export interface CreateBillingConfig {
   basePath?: string;
   /** Separate mount point for webhook routes (e.g. "/api/v1/webhooks"). */
   webhookPath?: string;
-  config?: Partial<BillingAppConfig>;
+  config?: BillingAppConfigInput;
   logger?: BillingLogger;
   cache?: KeyValueCache;
 }

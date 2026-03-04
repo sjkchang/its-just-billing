@@ -113,7 +113,11 @@ export function createBillingClient(options?: BillingClientOptions): BillingClie
       } catch {
         // ignore
       }
-      throw new BillingClientError(`Billing API error: ${res.status}`, res.status, errorBody);
+      const serverMessage =
+        errorBody && typeof errorBody === "object" && "error" in errorBody && typeof (errorBody as Record<string, unknown>).error === "string"
+          ? (errorBody as Record<string, string>).error
+          : `Billing API error: ${res.status}`;
+      throw new BillingClientError(serverMessage, res.status, errorBody);
     }
 
     return res.json() as Promise<T>;

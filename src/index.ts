@@ -67,6 +67,7 @@ export type { Entitlement, EntitlementSet, EntitlementConfig } from "./core/doma
 export { BillingConfigSchema, isManagedProduct, getProductId, getManagedProducts, getConfiguredProductIds } from "./core/config";
 export type {
   BillingAppConfig,
+  BillingAppConfigInput,
   CancellationConfig,
   SubscriptionStrategyConfig,
   ProductConfig,

@@ -6,7 +6,7 @@
  * concepts (e.g. ChangeStrategy) to its own API.
  */
 
-import type { SubscriptionStatus } from "../core/entities";
+import type { SubscriptionStatus, BillingProviderType } from "../core/entities";
 import type { ProductConfig } from "../core/config";
 
 // ============================================================================
@@ -166,7 +166,7 @@ export interface BillingProviders {
 // Config
 // ============================================================================
 
-export type BillingProviderType = "stripe" | "mock";
+export type { BillingProviderType };
 
 export type BillingProviderConfig =
   | { provider: "stripe"; secretKey: string; webhookSecret?: string }

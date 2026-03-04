@@ -38,6 +38,15 @@ export interface BillingContext {
   cache?: KeyValueCache;
 }
 
+// ============================================================================
+// ID Generation
+// ============================================================================
+
+import { nanoid } from "nanoid";
+
+/** Generate a unique ID. Central point for changing ID strategy. */
+export const createId: () => string = nanoid;
+
 export const defaultLogger: BillingLogger = {
   debug: (msg, data) => console.debug(`[billing] ${msg}`, data ?? ""),
   info: (msg, data) => console.info(`[billing] ${msg}`, data ?? ""),

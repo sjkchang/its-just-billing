@@ -5,7 +5,7 @@
  * Framework-agnostic — just like Better Auth's handler.
  */
 
-import Trouter from "trouter";
+import { Trouter } from "trouter";
 import type { BillingInstance } from "../billing";
 import {
   CheckoutRequestSchema,

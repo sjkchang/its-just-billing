@@ -5,12 +5,12 @@
  * syncCustomerState is the core method — all other sync paths resolve to it.
  */
 
-import { nanoid } from "nanoid";
 import type { BillingProviderType, Customer, Subscription } from "../core/entities";
 import { isActive, hasEnded } from "../core/domain";
 import { runAfterHook } from "../core/hooks";
 import type { BillingUser } from "../core/hooks";
 import type { BillingContext } from "../core/types";
+import { createId } from "../core/types";
 
 export class BillingSyncService {
   constructor(private ctx: BillingContext) {}
@@ -83,11 +83,11 @@ export class BillingSyncService {
     providerCustomerId: string,
     provider: BillingProviderType
   ): Promise<void> {
-    this.ctx.logger.info("syncCustomerState called", { providerCustomerId });
+    this.ctx.logger.debug("syncCustomerState called", { providerCustomerId });
 
     const state = await this.ctx.providers.customers.getCustomerState(providerCustomerId);
 
-    this.ctx.logger.info("Got customer state from provider", {
+    this.ctx.logger.debug("Got customer state from provider", {
       providerCustomerId,
       hasState: !!state,
       subscriptionCount: state?.subscriptions?.length ?? 0,
@@ -131,7 +131,7 @@ export class BillingSyncService {
         });
 
         customer = await txAdapter.customers.create({
-          id: nanoid(),
+          id: createId(),
           userId: state.customer.externalId,
           provider,
           providerCustomerId: state.customer.id,
@@ -150,7 +150,7 @@ export class BillingSyncService {
       for (const sub of state.subscriptions) {
         activeProviderIds.add(sub.id);
         await txAdapter.subscriptions.upsertByProviderSubscriptionId({
-          id: nanoid(),
+          id: createId(),
           customerId: customer.id,
           providerSubscriptionId: sub.id,
           providerProductId: sub.productId,
@@ -191,12 +191,15 @@ export class BillingSyncService {
 
     const resolvedCustomer = syncedCustomer as Customer | null;
 
-    // Invalidate status cache after sync
+    // Invalidate caches after sync
     if (resolvedCustomer && this.ctx.cache) {
       try {
-        await this.ctx.cache.delete(`billing:status:${resolvedCustomer.userId}`);
+        await Promise.all([
+          this.ctx.cache.delete(`billing:status:${resolvedCustomer.userId}`),
+          this.ctx.cache.delete("billing:products"),
+        ]);
       } catch (err) {
-        this.ctx.logger.warn("Failed to invalidate status cache after sync", {
+        this.ctx.logger.warn("Failed to invalidate cache after sync", {
           userId: resolvedCustomer.userId,
           error: err instanceof Error ? err.message : String(err),
         });

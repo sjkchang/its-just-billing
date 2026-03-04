@@ -86,6 +86,7 @@ export type ProductEntry = z.infer<typeof ProductEntrySchema>;
 export type CancellationConfig = z.infer<typeof CancellationConfigSchema>;
 export type SubscriptionStrategyConfig = z.infer<typeof SubscriptionStrategySchema>;
 export type BillingAppConfig = z.infer<typeof BillingConfigSchema>;
+export type BillingAppConfigInput = z.input<typeof BillingConfigSchema>;
 
 // ============================================================================
 // Product Entry Helpers

@@ -34,21 +34,21 @@
 
 - [ ] **13. `@internal` services are publicly accessible** — `src/billing.ts:79-85` — Marked `@internal` but are public `readonly` fields.
 
-- [ ] **14. Custom route matching is fragile** — `src/handler/web.ts:42-66` — Mini regex router with no middleware, query params, or route groups.
+- [x] **14. Custom route matching is fragile** — Replaced with Trouter.
 
-- [ ] **15. Config type uses `Partial<BillingAppConfig>` incorrectly** — `src/billing.ts:37` — Should use `z.input<typeof BillingConfigSchema>` for proper type inference with defaults.
+- [x] **15. Config type uses `Partial<BillingAppConfig>` incorrectly** — Now uses `BillingAppConfigInput` (`z.input<typeof BillingConfigSchema>`).
 
 ## DX Issues
 
 - [ ] **16. No way to simulate webhooks in tests** — Mock provider has no `simulateWebhook` for integration testing without Stripe CLI.
 
-- [ ] **17. Client doesn't expose error body details** — `src/client.ts:115` — Error message is generic; server's message is buried in `body.error`.
+- [x] **17. Client doesn't expose error body details** — Client now extracts `body.error` message from server response.
 
 - [ ] **18. No subscription ID in checkout flow** — After checkout, client must poll `/status` or `/sync`. Worth documenting.
 
-- [ ] **19. Product listing cache has no invalidation** — `src/services/status.ts:168` — Products cached 1h with no invalidation on sync.
+- [x] **19. Product listing cache has no invalidation** — Sync now invalidates `billing:products` cache alongside status cache.
 
-- [ ] **20. `BillingUser.name` is `string | null` vs Stripe's `string | undefined`** — Creates `?? undefined` friction at boundaries.
+- [x] **20. `BillingUser.name` is `string | null` vs Stripe's `string | undefined`** — `BillingUser.name` is now optional (`name?: string | null`).
 
 ## Missing Features
 
@@ -66,10 +66,10 @@
 
 ## Minor Nits
 
-- [ ] **27. "Subscription ending in 0 days"** — `src/core/domain.ts:137` — Should say "ending today".
+- [x] **27. "Subscription ending in 0 days"** — Now says "ending today".
 
-- [ ] **28. `syncCustomerState called` logged at `info`** — `src/services/sync.ts:97` — Noisy in production, should be `debug`.
+- [x] **28. `syncCustomerState called` logged at `info`** — Downgraded to `debug`.
 
-- [ ] **29. `BillingProviderType` duplicated** — Defined in both `src/core/entities.ts` and `src/providers/types.ts`.
+- [x] **29. `BillingProviderType` duplicated** — `providers/types.ts` now re-exports from `core/entities.ts`.
 
-- [ ] **30. `nanoid` scattered across codebase** — No central ID generation utility. Changing ID strategy requires ~10 edits.
+- [x] **30. `nanoid` scattered across codebase** — Centralized to `createId()` in `core/types.ts`.

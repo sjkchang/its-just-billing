@@ -20,7 +20,7 @@ import { defaultLogger } from "./types";
 export interface BillingUser {
   id: string;
   email: string;
-  name: string | null;
+  name?: string | null;
 }
 
 // ============================================================================

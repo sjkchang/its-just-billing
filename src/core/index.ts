@@ -14,7 +14,7 @@ export {
 } from "./errors";
 
 export type { BillingLogger, BillingContext } from "./types";
-export { defaultLogger } from "./types";
+export { defaultLogger, createId } from "./types";
 
 export {
   isActiveStatus,
@@ -30,7 +30,7 @@ export {
 export type { Entitlement, EntitlementSet, EntitlementConfig } from "./domain";
 
 export { BillingConfigSchema } from "./config";
-export type { BillingAppConfig, CancellationConfig, SubscriptionStrategyConfig } from "./config";
+export type { BillingAppConfig, BillingAppConfigInput, CancellationConfig, SubscriptionStrategyConfig } from "./config";
 
 export { runBeforeHook, runAfterHook } from "./hooks";
 export type {

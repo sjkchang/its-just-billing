@@ -6,9 +6,9 @@
  * - Otherwise, falls back to the billing_events table for persistence.
  */
 
-import { nanoid } from "nanoid";
 import { BillingBadRequestError } from "../core/errors";
 import type { BillingContext } from "../core/types";
+import { createId } from "../core/types";
 import type { BillingSyncService } from "./sync";
 
 /** Cache TTL for webhook dedup keys (24 hours). */
@@ -101,7 +101,7 @@ export class BillingWebhookService {
 
     try {
       await this.ctx.adapter.events.create({
-        id: nanoid(),
+        id: createId(),
         provider: this.ctx.providerType,
         providerEventId: eventId,
         eventType,

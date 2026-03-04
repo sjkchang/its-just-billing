@@ -2,7 +2,6 @@
  * Billing checkout service — handles checkout, portal, and subscription management.
  */
 
-import { nanoid } from "nanoid";
 import type { BillingSubscription } from "../providers";
 import {
   isActive,
@@ -14,6 +13,7 @@ import { runBeforeHook, runAfterHook } from "../core/hooks";
 import type { BillingUser } from "../core/hooks";
 import { BillingBadRequestError, BillingNotFoundError } from "../core/errors";
 import type { BillingContext } from "../core/types";
+import { createId } from "../core/types";
 
 export interface CheckoutInput {
   productId: string;
@@ -70,7 +70,7 @@ export class BillingCheckoutService {
 
     try {
       const customer = await this.ctx.adapter.customers.create({
-        id: nanoid(),
+        id: createId(),
         userId: user.id,
         provider,
         providerCustomerId: providerCustomer.id,

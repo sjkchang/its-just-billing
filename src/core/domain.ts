@@ -134,9 +134,9 @@ export function getStatusMessage(subscription: Subscription | null): string {
     case "active":
       if (subscription.pendingCancellation) {
         const days = daysUntilEnd(subscription);
-        return days !== null
-          ? `Subscription ending in ${days} day${days === 1 ? "" : "s"}`
-          : "Subscription ending soon";
+        if (days === null) return "Subscription ending soon";
+        if (days === 0) return "Subscription ending today";
+        return `Subscription ending in ${days} day${days === 1 ? "" : "s"}`;
       }
       return "Active subscription";
     case "trialing":
