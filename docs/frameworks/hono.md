@@ -49,6 +49,37 @@ app.all("/api/v1/webhooks/*", (c) => billing.handler(c.req.raw));
 
 Webhook requests arriving at `/api/v1/webhooks/stripe` will be routed correctly.
 
+## Native Hono routes
+
+For a more idiomatic Hono integration, use `createBillingRoutes` which returns a Hono app with native routes:
+
+```ts
+import { Hono } from "hono";
+import { createBilling } from "its-just-billing";
+import { createBillingRoutes } from "its-just-billing/hono";
+import { drizzleRepositories, createBillingSchema } from "its-just-billing/repositories/drizzle";
+
+const billing = await createBilling({
+  adapter: drizzleRepositories(db, billingSchema),
+  provider: {
+    provider: "stripe",
+    secretKey: process.env.STRIPE_SECRET_KEY!,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  },
+  resolveUser: async (req) => {
+    const session = await auth.getSession(req);
+    return session?.user ?? null;
+  },
+});
+
+const app = new Hono();
+
+// Mount as a native Hono sub-app
+app.route("/api/v1/billing", createBillingRoutes(billing));
+```
+
+This gives you native Hono routing, error handling via `app.onError`, and direct access to the Hono context in middleware.
+
 ## Using the server-side API in routes
 
 Use `billing.api` directly in your Hono routes — no HTTP round-trip needed:

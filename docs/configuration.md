@@ -30,6 +30,9 @@ const billing = await createBilling({
 
   // Optional: custom logger
   logger: myLogger,
+
+  // Optional: key-value cache (e.g. Redis) for status and product lookups
+  cache: myCache,
 });
 ```
 
@@ -71,7 +74,7 @@ The return type is `BillingUser`:
 interface BillingUser {
   id: string;
   email: string;
-  name: string | null;
+  name?: string | null;
 }
 ```
 
@@ -89,6 +92,22 @@ interface BillingLogger {
 ```
 
 The default logger writes to `console` with a `[billing]` prefix.
+
+### Cache
+
+Pass any object that satisfies `KeyValueCache` to enable caching of billing status and product lookups:
+
+```ts
+interface KeyValueCache {
+  get(key: string): Promise<string | null | undefined>;
+  set(key: string, value: string, ttl?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+  /** Atomic set-if-not-exists. Returns true if the key was set. */
+  setIfAbsent?(key: string, value: string, ttl?: number): Promise<boolean>;
+}
+```
+
+Status results are cached for 5 minutes and product lists for 1 hour. Cache is automatically invalidated on mutations (sync, webhook processing).
 
 ## Products
 
@@ -219,6 +238,9 @@ config: {
     // Allow users to downgrade their plan (default: false)
     allowDowngrade: false,
 
+    // Allow users to sidegrade (switch between same-tier plans) (default: false)
+    allowSidegrade: false,
+
     // How to handle upgrade billing (default: "immediate_prorate")
     //   "immediate_prorate" — change now, prorate the difference
     //   "immediate_full" — change now, invoice the full new price
@@ -228,6 +250,12 @@ config: {
     //   "immediate_prorate" — change now, credit the difference
     //   "at_period_end" — schedule the change for next billing cycle
     downgradeStrategy: "at_period_end",
+
+    // How to handle sidegrade billing (default: "immediate_prorate")
+    //   "immediate_prorate" — change now, prorate the difference
+    //   "immediate_full" — change now, invoice the full new price
+    //   "at_period_end" — schedule the change for next billing cycle
+    sidegradeStrategy: "immediate_prorate",
 
     // Cancellation behavior
     cancellation: {
@@ -242,6 +270,17 @@ config: {
     // Explicit tier ordering for determining upgrade vs downgrade direction.
     // Lower index = lower tier. If omitted, price comparison is used instead.
     tierOrder: ["prod_free", "prod_starter", "prod_pro", "prod_enterprise"],
+
+    // Trial period in days for new subscriptions (optional)
+    trialDays: 14,
+
+    // Only allow one active subscription per customer (default: true)
+    singleSubscription: true,
+
+    // Days after going past_due before entitlements are revoked.
+    // Omit to keep entitlements forever during past_due.
+    // Set to 0 for immediate suspension.
+    pastDueGracePeriodDays: 7,
   },
 }
 ```
@@ -279,6 +318,18 @@ if (status.entitlements.includes("feature:advanced")) {
 }
 ```
 
+## Allowed redirect origins
+
+Restrict checkout and portal redirect URLs to specific origins. When set, any `successUrl`, `cancelUrl`, or `returnUrl` must match one of the allowed origins.
+
+```ts
+config: {
+  allowedRedirectOrigins: ["https://example.com", "https://app.example.com"],
+}
+```
+
+If omitted, any URL is accepted.
+
 ## Hooks
 
 Hooks let you run custom logic when billing events occur. There are two categories:
@@ -315,7 +366,8 @@ config: {
       },
 
       planChange: {
-        before: async ({ user, fromProductId, toProductId, direction, strategy }) => {
+        before: async ({ user, customer, subscription, fromProductId, toProductId, direction, strategy }) => {
+          // direction is "upgrade" | "downgrade" | "sidegrade"
           console.log(`${direction}: ${fromProductId} → ${toProductId} (${strategy})`);
         },
       },

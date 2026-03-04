@@ -19,9 +19,13 @@ const billing = createBillingClient({
 ```ts
 const status = await billing.getStatus();
 // status.entitlements: string[]
-// status.subscription: { id, status, currentPeriodEnd, pendingCancellation } | null
+// status.accessState: "active" | "trialing" | "grace_period" | "suspended" | "canceled" | "provider_missing" | "free"
 // status.productId: string | null
+// status.productName: string | null
+// status.productDescription: string | null
+// status.subscription: { id, status, currentPeriodEnd, pendingCancellation } | null
 // status.statusMessage: string
+// status.metadata: Record<string, string> | null
 ```
 
 ### getProducts
@@ -81,10 +85,13 @@ const status = await billing.resumeSubscription(subscriptionId);
 
 ### changeSubscription
 
-Switch to a different plan.
+Switch to a different plan. Optionally specify an `interval` to switch to a specific price.
 
 ```ts
 const status = await billing.changeSubscription(subscriptionId, "prod_pro");
+
+// With interval
+const status = await billing.changeSubscription(subscriptionId, "prod_pro", "year");
 ```
 
 ## Error handling

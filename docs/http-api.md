@@ -13,6 +13,7 @@ Get the current user's billing status, active subscription, and entitlements.
 ```json
 {
   "entitlements": ["plan:paid", "feature:basic"],
+  "accessState": "active",
   "productId": "prod_starter",
   "productName": "Starter",
   "productDescription": "For small teams",
@@ -26,6 +27,18 @@ Get the current user's billing status, active subscription, and entitlements.
   "metadata": { "popular": "true" }
 }
 ```
+
+`accessState` indicates the user's current access level:
+
+| Value | Meaning |
+| --- | --- |
+| `"active"` | Normal paid access |
+| `"trialing"` | Trial period |
+| `"grace_period"` | Payment past due, still within grace period |
+| `"suspended"` | Payment past due, grace period expired — entitlements revoked |
+| `"canceled"` | Subscription canceled |
+| `"provider_missing"` | Subscription exists locally but not found in provider |
+| `"free"` | No subscription |
 
 If the user has no subscription, `subscription` is `null` and entitlements reflect the free tier.
 
@@ -120,9 +133,12 @@ Change a subscription to a different product.
 
 ```json
 {
-  "productId": "prod_pro"
+  "productId": "prod_pro",
+  "interval": "month"
 }
 ```
+
+`interval` is optional (`"day"`, `"week"`, `"month"`, or `"year"`). When provided, the subscription switches to a price matching the given interval.
 
 **Response:** Updated billing status.
 
