@@ -7,7 +7,7 @@
 
 import type { Customer, BillingProviderType } from "../core/entities";
 import type { Subscription, SubscriptionStatus } from "../core/entities";
-import type { BillingEvent } from "../core/entities";
+import type { BillingEvent, Purchase, CartItem } from "../core/entities";
 
 // ============================================================================
 // Repository Interfaces
@@ -99,6 +99,34 @@ export interface BillingEventRepository {
   exists(providerEventId: string): Promise<boolean>;
 }
 
+export interface PurchaseRepository {
+  findById(id: string): Promise<Purchase | null>;
+  findByCustomerId(customerId: string): Promise<Purchase[]>;
+  create(data: {
+    id: string;
+    customerId: string;
+    providerSessionId: string;
+    providerProductId: string;
+    providerPriceId?: string | null;
+    quantity: number;
+    amount: number;
+    currency: string;
+    purchasedAt?: Date;
+  }): Promise<Purchase>;
+}
+
+export interface CartItemRepository {
+  findByUserId(userId: string): Promise<CartItem[]>;
+  upsert(data: {
+    id: string;
+    userId: string;
+    productId: string;
+    quantity: number;
+  }): Promise<CartItem>;
+  remove(userId: string, productId: string): Promise<void>;
+  clear(userId: string): Promise<void>;
+}
+
 // ============================================================================
 // Composite Repository Interface
 // ============================================================================
@@ -107,5 +135,7 @@ export interface BillingRepositories {
   customers: CustomerRepository;
   subscriptions: SubscriptionRepository;
   events: BillingEventRepository;
+  purchases: PurchaseRepository;
+  cartItems: CartItemRepository;
   transaction<T>(fn: (repos: BillingRepositories) => Promise<T>): Promise<T>;
 }

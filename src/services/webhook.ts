@@ -7,6 +7,7 @@
  */
 
 import { BillingBadRequestError } from "../core/errors";
+import { runAfterHook } from "../core/hooks";
 import type { BillingContext } from "../core/types";
 import { createId } from "../core/types";
 import type { BillingSyncService } from "./sync";
@@ -50,6 +51,15 @@ export class BillingWebhookService {
 
     await this.syncService.syncCustomerState(resource.customerId, this.ctx.providerType);
 
+    // Handle one-time purchase completion
+    if (
+      resource.checkoutMode === "payment" &&
+      resource.checkoutSessionId &&
+      this.ctx.providers.checkout.getCompletedSessionPurchases
+    ) {
+      await this.processPurchaseCompletion(resource.customerId, resource.checkoutSessionId);
+    }
+
     this.ctx.logger.info("Processed webhook", {
       eventId: resource.eventId,
       eventType: resource.eventType,
@@ -86,6 +96,67 @@ export class BillingWebhookService {
       this.ctx.logger.warn("Webhook dedup cache error, proceeding with event", { eventId });
       return true;
     }
+  }
+
+  /**
+   * Process a completed one-time purchase checkout session.
+   * Creates Purchase records from session line items and fires lifecycle hook.
+   */
+  private async processPurchaseCompletion(
+    providerCustomerId: string,
+    sessionId: string,
+  ): Promise<void> {
+    const items = await this.ctx.providers.checkout.getCompletedSessionPurchases!(sessionId);
+    if (items.length === 0) return;
+
+    const customer = await this.ctx.adapter.customers.findByProviderCustomerId(
+      providerCustomerId,
+      this.ctx.providerType,
+    );
+    if (!customer) {
+      this.ctx.logger.warn("Cannot record purchases — customer not found locally", {
+        providerCustomerId,
+        sessionId,
+      });
+      return;
+    }
+
+    const purchases = [];
+    for (const item of items) {
+      const purchase = await this.ctx.adapter.purchases.create({
+        id: createId(),
+        customerId: customer.id,
+        providerSessionId: sessionId,
+        providerProductId: item.providerProductId,
+        providerPriceId: item.providerPriceId,
+        quantity: item.quantity,
+        amount: item.amount,
+        currency: item.currency,
+      });
+      purchases.push(purchase);
+    }
+
+    this.ctx.logger.info("Recorded purchases from checkout session", {
+      customerId: customer.id,
+      sessionId,
+      purchaseCount: purchases.length,
+    });
+
+    // Invalidate status cache
+    if (this.ctx.cache) {
+      try {
+        await this.ctx.cache.delete(`billing:status:${customer.userId}`);
+      } catch {
+        // Cache failure — not critical
+      }
+    }
+
+    runAfterHook(
+      this.ctx.config.hooks?.lifecycle?.onPurchaseCompleted,
+      { customer, purchases },
+      "lifecycle.onPurchaseCompleted",
+      this.ctx.logger,
+    );
   }
 
   /**

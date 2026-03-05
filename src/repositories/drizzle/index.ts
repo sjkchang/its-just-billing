@@ -10,6 +10,7 @@
 export { DrizzleCustomerRepository } from "./customers";
 export { DrizzleSubscriptionRepository } from "./subscriptions";
 export { DrizzleBillingEventRepository } from "./events";
+export { DrizzleCartItemRepository } from "./cart-items";
 export { drizzleRepositories } from "./factory";
 export type { DrizzleDB } from "./factory";
 

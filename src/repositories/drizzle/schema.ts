@@ -6,7 +6,7 @@
  * createBilling() and used by Drizzle Kit for migrations.
  */
 
-import { text, timestamp, boolean, pgTable, pgEnum, unique } from "drizzle-orm/pg-core";
+import { text, integer, timestamp, boolean, pgTable, pgEnum, unique } from "drizzle-orm/pg-core";
 import type { PgTableWithColumns } from "drizzle-orm/pg-core";
 
 export const billingProviderEnum = pgEnum("billing_provider", ["stripe", "mock"]);
@@ -78,10 +78,43 @@ export function createBillingSchema({ usersTable }: BillingSchemaOptions) {
     payload: text("payload"),
   });
 
+  const billingPurchases = pgTable("billing_purchases", {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => billingCustomers.id, { onDelete: "cascade" }),
+    providerSessionId: text("provider_session_id").notNull(),
+    providerProductId: text("provider_product_id").notNull(),
+    providerPriceId: text("provider_price_id"),
+    quantity: integer("quantity").notNull().default(1),
+    amount: integer("amount").notNull(),
+    currency: text("currency").notNull().default("usd"),
+    purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  });
+
+  const billingCartItems = pgTable(
+    "billing_cart_items",
+    {
+      id: text("id").primaryKey(),
+      userId: text("user_id")
+        .notNull()
+        .references(() => usersTable.id, { onDelete: "cascade" }),
+      productId: text("product_id").notNull(),
+      quantity: integer("quantity").notNull().default(1),
+      createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (t) => [unique("billing_cart_items_user_product").on(t.userId, t.productId)]
+  );
+
   return {
     billingCustomers,
     billingSubscriptions,
     billingEvents,
+    billingPurchases,
+    billingCartItems,
     billingProviderEnum,
     subscriptionStatusEnum,
   };
@@ -91,5 +124,5 @@ export type BillingSchema = ReturnType<typeof createBillingSchema>;
 
 export type BillingTables = Pick<
   BillingSchema,
-  "billingCustomers" | "billingSubscriptions" | "billingEvents"
+  "billingCustomers" | "billingSubscriptions" | "billingEvents" | "billingPurchases" | "billingCartItems"
 >;

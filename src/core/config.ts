@@ -46,7 +46,7 @@ const SubscriptionStrategySchema = z
 const ProductPriceConfigSchema = z.object({
   amount: z.number().int().positive(),
   currency: z.string().default("usd"),
-  interval: z.enum(["month", "year"]),
+  interval: z.enum(["month", "year", "one_time"]),
 });
 
 const ProductConfigSchema = z.object({
@@ -55,6 +55,8 @@ const ProductConfigSchema = z.object({
   description: z.string().optional(),
   prices: z.array(ProductPriceConfigSchema).min(1),
   metadata: z.record(z.string()).optional(),
+  /** Whether this product can be purchased multiple times (qty > 1 or repeat purchases). Defaults to false. */
+  allowMultiple: z.boolean().default(false),
 });
 
 /** A product entry is either a full managed config or a string ID reference. */

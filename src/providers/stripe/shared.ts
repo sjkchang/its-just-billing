@@ -106,6 +106,40 @@ export async function resolveRecurringPriceId(stripe: Stripe, productId: string)
  * Resolve a productId + interval to a recurring priceId.
  * Fetches all active recurring prices for the product and matches by interval.
  */
+/**
+ * Resolve a productId to a one-time priceId.
+ * Uses the product's default_price if it's one-time, or falls back to the first active one-time price.
+ */
+export async function resolveOneTimePriceId(stripe: Stripe, productId: string): Promise<string> {
+  const product = await stripe.products.retrieve(productId);
+
+  if (product.default_price) {
+    const defaultPrice = product.default_price;
+    if (typeof defaultPrice !== "string" && !defaultPrice.recurring) {
+      return defaultPrice.id;
+    }
+    if (typeof defaultPrice === "string") {
+      const price = await stripe.prices.retrieve(defaultPrice);
+      if (!price.recurring) {
+        return price.id;
+      }
+    }
+  }
+
+  const prices = await stripe.prices.list({
+    product: productId,
+    active: true,
+    type: "one_time",
+    limit: 1,
+  });
+
+  if (prices.data.length === 0) {
+    throw new Error(`No active one-time price found for product ${productId}`);
+  }
+
+  return prices.data[0].id;
+}
+
 export async function resolveRecurringPriceByInterval(
   stripe: Stripe,
   productId: string,

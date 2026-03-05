@@ -75,11 +75,26 @@ export interface CheckoutOptions {
   trialDays?: number;
 }
 
+export interface CheckoutLineItem {
+  productId: string;
+  quantity?: number;
+}
+
+export interface PurchaseCheckoutOptions {
+  customerId: string;
+  items: CheckoutLineItem[];
+  successUrl: string;
+  cancelUrl?: string;
+  metadata?: Record<string, string>;
+}
+
 export interface WebhookResource {
   eventId: string;
   eventType: string;
   resourceType: "subscription" | "customer" | "order";
   customerId: string;
+  checkoutSessionId?: string;
+  checkoutMode?: "subscription" | "payment";
 }
 
 /**
@@ -125,8 +140,18 @@ export interface BillingProductProvider {
   syncProducts?(products: ProductConfig[]): Promise<void>;
 }
 
+export interface CompletedPurchaseItem {
+  providerProductId: string;
+  providerPriceId: string | null;
+  quantity: number;
+  amount: number;
+  currency: string;
+}
+
 export interface BillingCheckoutProvider {
   createCheckoutSession(options: CheckoutOptions): Promise<CheckoutSession>;
+  createPurchaseCheckoutSession?(options: PurchaseCheckoutOptions): Promise<CheckoutSession>;
+  getCompletedSessionPurchases?(sessionId: string): Promise<CompletedPurchaseItem[]>;
   createPortalSession(customerId: string, returnUrl: string): Promise<PortalSession>;
 }
 

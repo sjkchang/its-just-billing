@@ -21,6 +21,12 @@ export interface CheckoutInput {
   cancelUrl?: string;
 }
 
+export interface PurchaseCheckoutInput {
+  items: { productId: string; quantity?: number }[];
+  successUrl: string;
+  cancelUrl?: string;
+}
+
 export interface CheckoutResult {
   checkoutUrl: string;
 }
@@ -148,6 +154,43 @@ export class BillingCheckoutService {
     await this.invalidateStatusCache(user.id);
 
     runAfterHook(hooks?.api?.checkout?.after, hookCtx, "checkout.after", this.ctx.logger);
+
+    return {
+      checkoutUrl: session.checkoutUrl,
+    };
+  }
+
+  /**
+   * Create a purchase checkout session for one-time products.
+   */
+  async createPurchaseCheckout(user: BillingUser, input: PurchaseCheckoutInput): Promise<CheckoutResult> {
+    if (!this.ctx.providers.checkout.createPurchaseCheckoutSession) {
+      throw new BillingBadRequestError("One-time purchases are not supported by this provider");
+    }
+
+    // Validate all products exist
+    for (const item of input.items) {
+      const product = await this.ctx.providers.products.getProduct(item.productId);
+      if (!product) {
+        throw new BillingBadRequestError(`Invalid product ID: ${item.productId}`);
+      }
+    }
+
+    const customer = await this.getOrCreateCustomer(user);
+
+    const session = await this.ctx.providers.checkout.createPurchaseCheckoutSession({
+      customerId: customer.providerCustomerId,
+      items: input.items,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl,
+    });
+
+    this.ctx.logger.info("Created purchase checkout session", {
+      userId: user.id,
+      itemCount: input.items.length,
+    });
+
+    await this.invalidateStatusCache(user.id);
 
     return {
       checkoutUrl: session.checkoutUrl,

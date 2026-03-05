@@ -114,10 +114,10 @@ export class StripeProductProvider implements BillingProductProvider {
 
     if (!stripeProduct) {
       this.logger.info(`Creating product "${product.id}"`);
-      stripeProduct = await this.stripe.products.create(
-        { id: product.id, ...productFields },
-        { idempotencyKey: `billing-create-product:${product.id}` },
-      );
+      stripeProduct = await this.stripe.products.create({
+        id: product.id,
+        ...productFields,
+      });
     } else if (!stripeProduct.active) {
       this.logger.info(`Reactivating archived product "${product.id}"`);
       stripeProduct = await this.stripe.products.update(product.id, { active: true, ...productFields });
@@ -140,11 +140,14 @@ export class StripeProductProvider implements BillingProductProvider {
     let firstPriceId: string | null = null;
 
     for (const configPrice of product.prices) {
+      const isOneTime = configPrice.interval === "one_time";
       const match = existingPrices.data.find(
         (sp) =>
           sp.unit_amount === configPrice.amount &&
           sp.currency === configPrice.currency &&
-          sp.recurring?.interval === configPrice.interval &&
+          (isOneTime
+            ? !sp.recurring
+            : sp.recurring?.interval === configPrice.interval) &&
           !matchedStripePriceIds.has(sp.id),
       );
 
@@ -153,15 +156,14 @@ export class StripeProductProvider implements BillingProductProvider {
         if (!firstPriceId) firstPriceId = match.id;
       } else {
         this.logger.info(`Creating price for "${product.id}": ${configPrice.amount} ${configPrice.currency}/${configPrice.interval}`);
-        const newPrice = await this.stripe.prices.create(
-          {
-            product: product.id,
-            unit_amount: configPrice.amount,
-            currency: configPrice.currency,
-            recurring: { interval: configPrice.interval },
-          },
-          { idempotencyKey: `billing-create-price:${product.id}:${configPrice.amount}:${configPrice.currency}:${configPrice.interval}` },
-        );
+        const newPrice = await this.stripe.prices.create({
+          product: product.id,
+          unit_amount: configPrice.amount,
+          currency: configPrice.currency,
+          ...(isOneTime
+            ? {}
+            : { recurring: { interval: configPrice.interval as "month" | "year" } }),
+        });
         matchedStripePriceIds.add(newPrice.id);
         if (!firstPriceId) firstPriceId = newPrice.id;
       }

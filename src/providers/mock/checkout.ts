@@ -9,7 +9,9 @@ import type {
   BillingCheckoutProvider,
   CheckoutOptions,
   CheckoutSession,
+  CompletedPurchaseItem,
   PortalSession,
+  PurchaseCheckoutOptions,
 } from "../types";
 
 export class MockCheckoutProvider implements BillingCheckoutProvider {
@@ -49,6 +51,40 @@ export class MockCheckoutProvider implements BillingCheckoutProvider {
       checkoutUrl: options.successUrl,
       sessionId: `mock_session_${Date.now()}`,
     };
+  }
+
+  async createPurchaseCheckoutSession(options: PurchaseCheckoutOptions): Promise<CheckoutSession> {
+    const sessionId = `mock_purchase_session_${++this.state.purchaseSessionIdCounter}`;
+
+    const items: CompletedPurchaseItem[] = options.items.map((item) => ({
+      providerProductId: item.productId,
+      providerPriceId: `mock_price_${item.productId}`,
+      quantity: item.quantity ?? 1,
+      amount: 1000 * (item.quantity ?? 1),
+      currency: "usd",
+    }));
+
+    this.state.purchaseSessions.set(sessionId, {
+      sessionId,
+      customerId: options.customerId,
+      items,
+    });
+
+    this.logger.debug("[Mock Billing] Created purchase checkout session", {
+      customerId: options.customerId,
+      itemCount: options.items.length,
+      sessionId,
+    });
+
+    return {
+      checkoutUrl: options.successUrl,
+      sessionId,
+    };
+  }
+
+  async getCompletedSessionPurchases(sessionId: string): Promise<CompletedPurchaseItem[]> {
+    const session = this.state.purchaseSessions.get(sessionId);
+    return session?.items ?? [];
   }
 
   async createPortalSession(customerId: string, returnUrl: string): Promise<PortalSession> {

@@ -115,11 +115,26 @@ export class StripeWebhookProvider implements BillingWebhookProvider {
         return null;
       }
 
+      // Populate checkout session fields for checkout.session.completed
+      let checkoutSessionId: string | undefined;
+      let checkoutMode: "subscription" | "payment" | undefined;
+      if (eventType === "checkout.session.completed") {
+        checkoutSessionId = data.id as string;
+        const mode = data.mode as string;
+        if (mode === "payment") {
+          checkoutMode = "payment";
+        } else if (mode === "subscription") {
+          checkoutMode = "subscription";
+        }
+      }
+
       return {
         eventId,
         eventType,
         resourceType,
         customerId,
+        checkoutSessionId,
+        checkoutMode,
       };
     } catch (error) {
       this.logger.error("Failed to parse webhook payload", {

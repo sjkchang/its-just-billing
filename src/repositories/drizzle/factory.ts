@@ -3,6 +3,8 @@ import type { BillingTables } from "./schema";
 import { DrizzleCustomerRepository } from "./customers";
 import { DrizzleSubscriptionRepository } from "./subscriptions";
 import { DrizzleBillingEventRepository } from "./events";
+import { DrizzlePurchaseRepository } from "./purchases";
+import { DrizzleCartItemRepository } from "./cart-items";
 
 // ============================================================================
 // DrizzleDB Type
@@ -34,6 +36,8 @@ export function drizzleRepositories(db: DrizzleDB, tables: BillingTables): Billi
     customers: new DrizzleCustomerRepository(db, tables),
     subscriptions: new DrizzleSubscriptionRepository(db, tables),
     events: new DrizzleBillingEventRepository(db, tables),
+    purchases: new DrizzlePurchaseRepository(db, tables),
+    cartItems: new DrizzleCartItemRepository(db, tables),
     async transaction<T>(fn: (repos: BillingRepositories) => Promise<T>): Promise<T> {
       let result: T;
       await db.transaction(async (tx) => {
@@ -41,6 +45,8 @@ export function drizzleRepositories(db: DrizzleDB, tables: BillingTables): Billi
           customers: new DrizzleCustomerRepository(tx, tables),
           subscriptions: new DrizzleSubscriptionRepository(tx, tables),
           events: new DrizzleBillingEventRepository(tx, tables),
+          purchases: new DrizzlePurchaseRepository(tx, tables),
+          cartItems: new DrizzleCartItemRepository(tx, tables),
           transaction: () => {
             throw new Error("Nested transactions are not supported");
           },

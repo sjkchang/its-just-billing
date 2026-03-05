@@ -79,3 +79,45 @@ export const BillingEvent = z.object({
 });
 
 export type BillingEvent = z.infer<typeof BillingEvent>;
+
+// ============================================================================
+// Purchase (one-time)
+// ============================================================================
+
+export const Purchase = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  providerSessionId: z.string(),
+  providerProductId: z.string(),
+  providerPriceId: z.string().nullable(),
+  quantity: z.number().int().positive(),
+  amount: z.number().int().nonnegative(),
+  currency: z.string(),
+  purchasedAt: z.date(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type Purchase = z.infer<typeof Purchase>;
+
+// ============================================================================
+// Cart
+// ============================================================================
+
+export const CartItem = z.object({
+  id: z.string(),
+  userId: z.string(),
+  productId: z.string(),
+  quantity: z.number().int().positive(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type CartItem = z.infer<typeof CartItem>;
+
+export const Cart = z.object({
+  userId: z.string(),
+  items: z.array(CartItem),
+});
+
+export type Cart = z.infer<typeof Cart>;

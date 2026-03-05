@@ -8,7 +8,7 @@
  * User where BillingUser is expected works without casts.
  */
 
-import type { Customer, Subscription } from "./entities";
+import type { Customer, Purchase, Subscription } from "./entities";
 import { BillingBadRequestError } from "./errors";
 import type { BillingLogger } from "./types";
 import { defaultLogger } from "./types";
@@ -75,6 +75,11 @@ export interface CustomerCreatedContext {
   customer: Customer;
 }
 
+export interface PurchaseCompletedContext {
+  customer: Customer;
+  purchases: Purchase[];
+}
+
 // ============================================================================
 // Hook Interface
 // ============================================================================
@@ -115,6 +120,7 @@ export interface BillingHooks {
     onSubscriptionChanged?: (ctx: SubscriptionChangedContext) => Promise<void>;
     onSubscriptionExpired?: (ctx: SubscriptionExpiredContext) => Promise<void>;
     onCustomerCreated?: (ctx: CustomerCreatedContext) => Promise<void>;
+    onPurchaseCompleted?: (ctx: PurchaseCompletedContext) => Promise<void>;
   };
 }
 

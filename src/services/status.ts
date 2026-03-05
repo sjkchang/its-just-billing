@@ -2,10 +2,10 @@
  * Billing status service — resolves user billing status and entitlements.
  */
 
-import type { Subscription, SubscriptionStatus } from "../core/entities";
+import type { Purchase, Subscription, SubscriptionStatus } from "../core/entities";
 import { getActiveSubscription, getStatusMessage, EntitlementResolver } from "../core/domain";
 import type { ProductEntry } from "../core/config";
-import { getConfiguredProductIds } from "../core/config";
+import { getConfiguredProductIds, isManagedProduct } from "../core/config";
 import type { BillingUser } from "../core/hooks";
 import type { BillingContext } from "../core/types";
 
@@ -32,6 +32,14 @@ export interface BillingStatusResult {
     pendingCancellation: boolean;
     pendingProductId: string | null;
   } | null;
+  purchases: {
+    id: string;
+    providerProductId: string;
+    quantity: number;
+    amount: number;
+    currency: string;
+    purchasedAt: Date;
+  }[];
   statusMessage: string;
   metadata: Record<string, string> | null;
 }
@@ -47,6 +55,7 @@ export interface ProductResult {
     interval: "day" | "week" | "month" | "year" | "one_time";
   }[];
   metadata?: Record<string, string>;
+  allowMultiple: boolean;
 }
 
 export class BillingStatusService {
@@ -79,6 +88,11 @@ export class BillingStatusService {
           if (parsed.subscription?.currentPeriodEnd) {
             parsed.subscription.currentPeriodEnd = new Date(parsed.subscription.currentPeriodEnd);
           }
+          if (parsed.purchases) {
+            for (const p of parsed.purchases) {
+              if (p.purchasedAt) p.purchasedAt = new Date(p.purchasedAt);
+            }
+          }
           return parsed;
         }
       } catch (err) {
@@ -91,6 +105,7 @@ export class BillingStatusService {
 
     const customer = await this.ctx.adapter.customers.findByUserId(user.id, this.ctx.providerType);
     let activeSubscription: Subscription | null = null;
+    let purchases: Purchase[] = [];
 
     let providerMissingSub: Subscription | null = null;
 
@@ -100,17 +115,29 @@ export class BillingStatusService {
       if (!activeSubscription) {
         providerMissingSub = subscriptions.find((s) => s.status === "provider_missing") ?? null;
       }
+      purchases = await this.ctx.adapter.purchases.findByCustomerId(customer.id);
     }
 
+    const purchaseProductIds = [...new Set(purchases.map((p) => p.providerProductId))];
+    const purchasesResponse = purchases.map((p) => ({
+      id: p.id,
+      providerProductId: p.providerProductId,
+      quantity: p.quantity,
+      amount: p.amount,
+      currency: p.currency,
+      purchasedAt: p.purchasedAt,
+    }));
+
     if (!activeSubscription && !providerMissingSub) {
-      const result = this.buildFreeStatus();
+      const result = this.buildFreeStatus(purchaseProductIds, purchasesResponse);
       await this.cacheSet(cacheKey, result);
       return result;
     }
 
     if (!activeSubscription && providerMissingSub) {
+      const entitlementProductIds = [...purchaseProductIds];
       const result: BillingStatusResult = {
-        entitlements: Array.from(this.entitlementResolver.resolve([])),
+        entitlements: Array.from(this.entitlementResolver.resolve(entitlementProductIds)),
         accessState: "provider_missing",
         productId: providerMissingSub.providerProductId,
         productName: null,
@@ -122,6 +149,7 @@ export class BillingStatusService {
           pendingCancellation: false,
           pendingProductId: null,
         },
+        purchases: purchasesResponse,
         statusMessage: "Subscription not found in billing provider",
         metadata: null,
       };
@@ -135,9 +163,8 @@ export class BillingStatusService {
     const accessState = this.resolveAccessState(sub);
     const grantPaidEntitlements = accessState !== "suspended" && accessState !== "canceled";
 
-    const entitlements = grantPaidEntitlements
-      ? this.entitlementResolver.resolve([sub.providerProductId])
-      : this.entitlementResolver.resolve([]);
+    const subProductIds = grantPaidEntitlements ? [sub.providerProductId] : [];
+    const entitlements = this.entitlementResolver.resolve([...subProductIds, ...purchaseProductIds]);
 
     const result: BillingStatusResult = {
       entitlements: Array.from(entitlements),
@@ -152,6 +179,7 @@ export class BillingStatusService {
         pendingCancellation: sub.pendingCancellation,
         pendingProductId: sub.pendingProductId ?? null,
       },
+      purchases: purchasesResponse,
       statusMessage: getStatusMessage(activeSubscription),
       metadata: product?.metadata ?? null,
     };
@@ -187,6 +215,16 @@ export class BillingStatusService {
 
     const productList = await this.ctx.providers.products.listProducts();
 
+    // Build a lookup for allowMultiple from product config
+    const allowMultipleMap = new Map<string, boolean>();
+    if (this.configuredProducts) {
+      for (const entry of this.configuredProducts) {
+        if (isManagedProduct(entry)) {
+          allowMultipleMap.set(entry.id, entry.allowMultiple);
+        }
+      }
+    }
+
     const toResult = (prod: { id: string; name: string; description?: string | null; prices: { id: string; amount: number; currency: string; interval: "day" | "week" | "month" | "year" | "one_time" }[]; metadata?: Record<string, string> }): ProductResult => ({
       id: prod.id,
       name: prod.name,
@@ -198,6 +236,7 @@ export class BillingStatusService {
         interval: price.interval,
       })),
       metadata: prod.metadata,
+      allowMultiple: allowMultipleMap.get(prod.id) ?? false,
     });
 
     // No configured products → return all from provider
@@ -282,8 +321,11 @@ export class BillingStatusService {
     return "active";
   }
 
-  private buildFreeStatus(): BillingStatusResult {
-    const entitlements = this.entitlementResolver.resolve([]);
+  private buildFreeStatus(
+    purchaseProductIds: string[] = [],
+    purchases: BillingStatusResult["purchases"] = [],
+  ): BillingStatusResult {
+    const entitlements = this.entitlementResolver.resolve(purchaseProductIds);
     return {
       entitlements: Array.from(entitlements),
       accessState: "free",
@@ -291,6 +333,7 @@ export class BillingStatusService {
       productName: "Free",
       productDescription: null,
       subscription: null,
+      purchases,
       statusMessage: "Free tier - no active subscription",
       metadata: null,
     };
