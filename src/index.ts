@@ -37,15 +37,20 @@ export type {
   CustomerRepository,
   SubscriptionRepository,
   BillingEventRepository,
+  PurchaseRepository,
+  CartItemRepository,
 } from "./repositories/types";
 
 // Entities
 export {
   Customer,
   BillingProviderType,
+  Purchase,
   Subscription,
   SubscriptionStatus,
   BillingEvent,
+  CartItem,
+  Cart,
 } from "./core/entities";
 
 // Domain
@@ -88,6 +93,7 @@ export type {
   SubscriptionChangedContext,
   SubscriptionExpiredContext,
   CustomerCreatedContext,
+  PurchaseCompletedContext,
 } from "./core/hooks";
 
 // Errors
@@ -109,6 +115,9 @@ export type {
   CheckoutSession,
   PortalSession,
   CheckoutOptions,
+  CheckoutLineItem,
+  PurchaseCheckoutOptions,
+  CompletedPurchaseItem,
   WebhookResource,
   SubscriptionChangeStrategy,
   CancellationTiming,
@@ -131,8 +140,10 @@ export { BillingCheckoutService } from "./services/checkout";
 export type {
   CheckoutInput,
   CheckoutResult,
+  PurchaseCheckoutInput,
   PortalResult,
   ChangeSubscriptionInput,
 } from "./services/checkout";
 export { BillingSyncService } from "./services/sync";
 export { BillingWebhookService } from "./services/webhook";
+export { BillingCartService } from "./services/cart";

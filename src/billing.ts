@@ -18,7 +18,9 @@ import { BillingSyncService } from "./services/sync";
 import { BillingStatusService } from "./services/status";
 import { BillingCheckoutService } from "./services/checkout";
 import { BillingWebhookService } from "./services/webhook";
+import { BillingCartService } from "./services/cart";
 import type { BillingStatusResult } from "./services/status";
+import type { Cart, CartItem } from "./core/entities";
 
 import { createBillingHandler } from "./handler";
 
@@ -50,6 +52,10 @@ export interface BillingAPI {
     user: BillingUser,
     input: { productId: string; successUrl: string; cancelUrl?: string }
   ): ReturnType<BillingCheckoutService["createCheckout"]>;
+  createPurchaseCheckout(
+    user: BillingUser,
+    input: { items: { productId: string; quantity?: number }[]; successUrl: string; cancelUrl?: string }
+  ): ReturnType<BillingCheckoutService["createPurchaseCheckout"]>;
   createPortal(
     user: BillingUser,
     returnUrl: string
@@ -63,6 +69,12 @@ export interface BillingAPI {
   ): Promise<void>;
   syncBillingState(user: BillingUser): Promise<void>;
   handleWebhook(payload: string, headers: Record<string, string>): Promise<void>;
+  getCart(user: BillingUser): Promise<Cart>;
+  addCartItem(user: BillingUser, input: { productId: string; quantity?: number }): Promise<CartItem>;
+  updateCartItem(user: BillingUser, productId: string, input: { quantity: number }): Promise<CartItem>;
+  removeCartItem(user: BillingUser, productId: string): Promise<void>;
+  clearCart(user: BillingUser): Promise<void>;
+  checkoutCart(user: BillingUser, input: { successUrl: string; cancelUrl?: string }): Promise<{ checkoutUrl: string }>;
 }
 
 // ============================================================================
@@ -83,6 +95,8 @@ export class BillingInstance {
   readonly checkoutService: BillingCheckoutService;
   /** @internal */
   readonly webhookService: BillingWebhookService;
+  /** @internal */
+  readonly cartService: BillingCartService;
 
   private constructor(
     ctx: BillingContext,
@@ -98,6 +112,7 @@ export class BillingInstance {
     this.statusService = new BillingStatusService(ctx);
     this.checkoutService = new BillingCheckoutService(ctx);
     this.webhookService = new BillingWebhookService(ctx, this.syncService);
+    this.cartService = new BillingCartService(ctx);
 
     // Create handler
     this.handler = createBillingHandler(this, basePath, webhookPath, ctx.config.allowedRedirectOrigins);
@@ -111,6 +126,7 @@ export class BillingInstance {
       },
       listProducts: () => this.statusService.listProducts(),
       createCheckout: (user, input) => this.checkoutService.createCheckout(user, input),
+      createPurchaseCheckout: (user, input) => this.checkoutService.createPurchaseCheckout(user, input),
       createPortal: (user, returnUrl) => this.checkoutService.createPortal(user, returnUrl),
       cancelSubscription: (user, subscriptionId) =>
         this.checkoutService.cancelSubscription(user, subscriptionId),
@@ -121,6 +137,12 @@ export class BillingInstance {
       changeSubscription: (user, input) => this.checkoutService.changeSubscription(user, input),
       syncBillingState: (user) => this.syncService.syncBillingState(user),
       handleWebhook: (payload, headers) => this.webhookService.handleWebhook(payload, headers),
+      getCart: (user) => this.cartService.getCart(user),
+      addCartItem: (user, input) => this.cartService.addItem(user, input),
+      updateCartItem: (user, productId, input) => this.cartService.updateItem(user, productId, input),
+      removeCartItem: (user, productId) => this.cartService.removeItem(user, productId),
+      clearCart: (user) => this.cartService.clearCart(user),
+      checkoutCart: (user, input) => this.cartService.checkoutCart(user, input),
     };
   }
 

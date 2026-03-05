@@ -10,8 +10,14 @@ import type { BillingInstance } from "../billing";
 import {
   CheckoutRequestSchema,
   PortalRequestSchema,
+  PurchaseRequestSchema,
   UpdateSubscriptionBodySchema,
+  AddCartItemSchema,
+  UpdateCartItemSchema,
+  CartCheckoutSchema,
   toBillingStatusResponse,
+  toCartResponse,
+  toCartItemResponse,
   resolveUserOrThrow,
   validateRedirectUrl,
   mapBillingError,
@@ -69,6 +75,15 @@ export function createBillingHandler(
       const result = await instance.checkoutService.createCheckout(user, data);
       return jsonResponse(result);
     })
+    .post("/purchase", async (request) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      const body = await request.json();
+      const data = PurchaseRequestSchema.parse(body);
+      validateRedirectUrl(data.successUrl, allowedRedirectOrigins);
+      if (data.cancelUrl) validateRedirectUrl(data.cancelUrl, allowedRedirectOrigins);
+      const result = await instance.checkoutService.createPurchaseCheckout(user, data);
+      return jsonResponse(result);
+    })
     .post("/portal", async (request) => {
       const user = await resolveUserOrThrow(instance.resolveUser, request);
       const body = await request.json();
@@ -116,6 +131,44 @@ export function createBillingHandler(
       });
       const status = await instance.statusService.getBillingStatus(user);
       return jsonResponse(toBillingStatusResponse(status));
+    })
+    .get("/cart", async (request) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      const cart = await instance.cartService.getCart(user);
+      return jsonResponse(toCartResponse(cart));
+    })
+    .post("/cart/items", async (request) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      const body = await request.json();
+      const data = AddCartItemSchema.parse(body);
+      const item = await instance.cartService.addItem(user, data);
+      return jsonResponse(toCartItemResponse(item), 201);
+    })
+    .patch("/cart/items/:productId", async (request, params) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      const body = await request.json();
+      const data = UpdateCartItemSchema.parse(body);
+      const item = await instance.cartService.updateItem(user, params.productId, data);
+      return jsonResponse(toCartItemResponse(item));
+    })
+    .delete("/cart/items/:productId", async (request, params) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      await instance.cartService.removeItem(user, params.productId);
+      return jsonResponse({ success: true });
+    })
+    .delete("/cart", async (request) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      await instance.cartService.clearCart(user);
+      return jsonResponse({ success: true });
+    })
+    .post("/cart/checkout", async (request) => {
+      const user = await resolveUserOrThrow(instance.resolveUser, request);
+      const body = await request.json();
+      const data = CartCheckoutSchema.parse(body);
+      validateRedirectUrl(data.successUrl, allowedRedirectOrigins);
+      if (data.cancelUrl) validateRedirectUrl(data.cancelUrl, allowedRedirectOrigins);
+      const result = await instance.cartService.checkoutCart(user, data);
+      return jsonResponse(result);
     })
     .post("/webhooks/stripe", async (request) => {
       const body = await request.text();

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { BillingBadRequestError, BillingUnauthorizedError, BillingNotFoundError } from "../core/errors";
 import type { BillingUser } from "../core/hooks";
 import type { BillingStatusResult } from "../services/status";
+import type { Cart, CartItem } from "../core/entities";
 
 // ============================================================================
 // Request Schemas
@@ -26,6 +27,33 @@ export const PortalRequestSchema = z.object({
 export const UpdateSubscriptionBodySchema = z.object({
   productId: z.string().min(1, "Product ID is required"),
   interval: z.enum(["day", "week", "month", "year"]).optional(),
+});
+
+export const AddCartItemSchema = z.object({
+  productId: z.string().min(1, "Product ID is required"),
+  quantity: z.number().int().positive().optional(),
+});
+
+export const UpdateCartItemSchema = z.object({
+  quantity: z.number().int().positive("Quantity must be a positive integer"),
+});
+
+export const CartCheckoutSchema = z.object({
+  successUrl: z.string().url("Success URL must be a valid URL"),
+  cancelUrl: z.string().url("Cancel URL must be a valid URL").optional(),
+});
+
+export const PurchaseRequestSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, "Product ID is required"),
+        quantity: z.number().int().positive().optional(),
+      }),
+    )
+    .min(1, "At least one item is required"),
+  successUrl: z.string().url("Success URL must be a valid URL"),
+  cancelUrl: z.string().url("Cancel URL must be a valid URL").optional(),
 });
 
 // ============================================================================
@@ -48,8 +76,32 @@ export function toBillingStatusResponse(result: BillingStatusResult) {
           pendingProductId: result.subscription.pendingProductId,
         }
       : null,
+    purchases: result.purchases.map((p) => ({
+      id: p.id,
+      providerProductId: p.providerProductId,
+      quantity: p.quantity,
+      amount: p.amount,
+      currency: p.currency,
+      purchasedAt: p.purchasedAt instanceof Date ? p.purchasedAt.toISOString() : p.purchasedAt,
+    })),
     statusMessage: result.statusMessage,
     metadata: result.metadata,
+  };
+}
+
+export function toCartItemResponse(item: CartItem) {
+  return {
+    productId: item.productId,
+    quantity: item.quantity,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+export function toCartResponse(cart: Cart) {
+  return {
+    userId: cart.userId,
+    items: cart.items.map(toCartItemResponse),
   };
 }
 
