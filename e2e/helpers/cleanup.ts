@@ -13,17 +13,37 @@ export async function cleanStaleE2EProducts(secretKey: string): Promise<void> {
 
   for await (const product of stripe.products.list({ active: true })) {
     if (!product.id.startsWith("e2e_")) continue;
+    await archiveProduct(stripe, product.id);
+  }
+}
+
+/**
+ * Delete any e2e customers left behind by crashed/interrupted test runs.
+ * Customers created by e2e tests have metadata.externalId starting with "e2e_".
+ */
+export async function cleanStaleE2ECustomers(secretKey: string): Promise<void> {
+  const stripe = new Stripe(secretKey);
+
+  for await (const customer of stripe.customers.list({ limit: 100 })) {
+    const externalId = customer.metadata?.externalId;
+    if (!externalId?.startsWith("e2e_")) continue;
 
     try {
-      const prices = await stripe.prices.list({ product: product.id, active: true });
-      for (const price of prices.data) {
-        await stripe.prices.update(price.id, { active: false });
-      }
-      await stripe.products.update(product.id, { active: false });
+      await stripe.customers.del(customer.id);
     } catch {
       // Best-effort
     }
   }
+}
+
+async function archiveProduct(stripe: Stripe, productId: string): Promise<void> {
+  // Clear default_price first — Stripe won't let you archive a product's default price
+  await stripe.products.update(productId, { default_price: "" });
+  // Deactivate ALL prices (paginated — default page size is 10)
+  for await (const price of stripe.prices.list({ product: productId, active: true })) {
+    await stripe.prices.update(price.id, { active: false });
+  }
+  await stripe.products.update(productId, { active: false });
 }
 
 export class StripeCleanup {
@@ -67,18 +87,9 @@ export class StripeCleanup {
       }
     }
 
-    // Archive products (can't delete products with prices)
+    // Archive products (can't delete products that have prices)
     for (const id of this.productIds) {
-      try {
-        // Archive all prices first
-        const prices = await this.stripe.prices.list({ product: id, active: true });
-        for (const price of prices.data) {
-          await this.stripe.prices.update(price.id, { active: false });
-        }
-        await this.stripe.products.update(id, { active: false });
-      } catch {
-        // Already archived or doesn't exist
-      }
+      await archiveProduct(this.stripe, id);
     }
   }
 }

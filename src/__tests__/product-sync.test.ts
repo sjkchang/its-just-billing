@@ -59,23 +59,17 @@ describe("StripeProductProvider.syncProducts", () => {
 
       await runSync([baseProduct]);
 
-      expect(mockStripe.products.create).toHaveBeenCalledWith(
-        {
-          id: "starter",
-          name: "Starter",
-          description: "For small teams",
-        },
-        { idempotencyKey: "billing-create-product:starter" },
-      );
-      expect(mockStripe.prices.create).toHaveBeenCalledWith(
-        {
-          product: "starter",
-          unit_amount: 1900,
-          currency: "usd",
-          recurring: { interval: "month" },
-        },
-        { idempotencyKey: "billing-create-price:starter:1900:usd:month" },
-      );
+      expect(mockStripe.products.create).toHaveBeenCalledWith({
+        id: "starter",
+        name: "Starter",
+        description: "For small teams",
+      });
+      expect(mockStripe.prices.create).toHaveBeenCalledWith({
+        product: "starter",
+        unit_amount: 1900,
+        currency: "usd",
+        recurring: { interval: "month" },
+      });
     });
   });
 
@@ -186,15 +180,12 @@ describe("StripeProductProvider.syncProducts", () => {
 
       await runSync([baseProduct]);
 
-      expect(mockStripe.prices.create).toHaveBeenCalledWith(
-        {
-          product: "starter",
-          unit_amount: 1900,
-          currency: "usd",
-          recurring: { interval: "month" },
-        },
-        { idempotencyKey: "billing-create-price:starter:1900:usd:month" },
-      );
+      expect(mockStripe.prices.create).toHaveBeenCalledWith({
+        product: "starter",
+        unit_amount: 1900,
+        currency: "usd",
+        recurring: { interval: "month" },
+      });
     });
 
     it("archives unmatched Stripe prices", async () => {

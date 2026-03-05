@@ -86,10 +86,34 @@ const DDL = `
     processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     payload TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS billing_purchases (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL REFERENCES billing_customers(id) ON DELETE CASCADE,
+    provider_session_id TEXT NOT NULL,
+    provider_product_id TEXT NOT NULL,
+    provider_price_id TEXT,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    amount INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'usd',
+    purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS billing_cart_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT billing_cart_items_user_product UNIQUE (user_id, product_id)
+  );
 `;
 
 const TRUNCATE = `
-  TRUNCATE billing_events, billing_subscriptions, billing_customers, users CASCADE;
+  TRUNCATE billing_cart_items, billing_purchases, billing_events, billing_subscriptions, billing_customers, users CASCADE;
 `;
 
 // ============================================================================
@@ -119,6 +143,8 @@ export async function setupDatabase(): Promise<E2EContext> {
     billingCustomers: billingSchema.billingCustomers,
     billingSubscriptions: billingSchema.billingSubscriptions,
     billingEvents: billingSchema.billingEvents,
+    billingPurchases: billingSchema.billingPurchases,
+    billingCartItems: billingSchema.billingCartItems,
   });
 
   const runPrefix = `e2e_${nanoid(8)}`;
